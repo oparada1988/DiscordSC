@@ -34,5 +34,11 @@ This plugin allows you to control your Discord client's mute and deafen state di
 
 ## Troubleshooting
 
-- **DISCONN displayed on keys**: This means the plugin is unable to find the Discord local socket. Make sure the Discord desktop app is open. If using Flatpak/Snap, verify that StreamController has permission to read the Discord socket at `/run/user/1000/discord-ipc-0` (or similar).
+- **DISCONN displayed on keys**: This means the plugin is unable to find the Discord local socket. Make sure the Discord desktop app is open.
+  - **Flatpak Sandbox Fix**: If you run StreamController as a Flatpak, it may be blocked from accessing the host's Discord socket. You can grant access by running:
+    ```bash
+    flatpak override --filesystem=xdg-run/discord-ipc-* com.core447.StreamController
+    ```
+    Then, restart StreamController.
 - **Authorization fails**: Double-check your Client ID and Client Secret, and verify that the Redirect URI in the settings matches your registered Redirect URI exactly.
+
