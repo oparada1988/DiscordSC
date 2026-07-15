@@ -1,0 +1,18 @@
+{
+    "version": "1.0.0",
+    "author": "oparada1988",
+    "thumbnail": "assets/discord.png",
+    "id": "com_oparada_DiscordPlugin",
+    "name": "Discord Plugin",
+    "descriptions": {
+        "en_US": "Control your Discord client's mute, deafen, and voice state directly from your StreamController deck."
+    },
+    "short-descriptions": {
+        "en_US": "Discord Integration for StreamController"
+    },
+    "tags": ["Utility", "Communication"],
+    "minimum-version": "1.0.0",
+    "app-version": "1.1.1-alpha",
+    "description": "Control your Discord client's mute, deafen, and voice state directly from your StreamController deck.",
+    "short-description": "Discord Integration for StreamController"
+}
