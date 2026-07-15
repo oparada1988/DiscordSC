@@ -612,3 +612,14 @@ class DiscordIPCClient:
             "channel_id": channel_id
         }
         self.send_command("SELECT_TEXT_CHANNEL", args=args, callback=callback)
+
+    def get_guilds(self, callback: Callable[[Dict[str, Any]], None]):
+        """Get list of guilds (servers) the user is in"""
+        self.send_command("GET_GUILDS", callback=callback)
+
+    def get_channels(self, guild_id: str, callback: Callable[[Dict[str, Any]], None]):
+        """Get list of channels in a guild"""
+        args = {
+            "guild_id": guild_id
+        }
+        self.send_command("GET_CHANNELS", args=args, callback=callback)
