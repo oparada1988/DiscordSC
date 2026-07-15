@@ -2,7 +2,8 @@
 
 ![Discord Plugin Thumbnail](assets/thumbnail.png)
 
-Control your Discord client's mute, deafen, and voice channel state directly from your StreamController deck. This plugin uses Discord's local IPC/RPC socket for bi-directional, real-time sync.
+Discord plugin for StreamController.
+Control your Discord client's mute, deafen, and voice channel state directly from your Stream Deck. This plugin uses Discord's local IPC/RPC socket for bi-directional, real-time sync.
 
 ## Features
 - **Mute & Deafen Toggle**: Toggle states with dynamic status displays and custom neon icons.
