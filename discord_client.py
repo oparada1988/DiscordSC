@@ -177,7 +177,7 @@ class DiscordIPCClient:
         )
         
         try:
-            cmd = ["flatpak-spawn", "--host", "python3", "-c", bridge_code]
+            cmd = ["flatpak-spawn", "--host", "--directory=/", "python3", "-c", bridge_code]
             proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             
             # Wait a short duration to verify it didn't exit with code 1 or 2
