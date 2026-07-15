@@ -44,7 +44,7 @@ class PluginTemplate(PluginBase):
         self.mute_action_holder = ActionHolder(
             plugin_base=self,
             action_base=MuteAction,
-            action_id="com_oparada_DiscordPlugin::MuteAction",
+            action_id="com_oparada_DiscordSC::MuteAction",
             action_name="Discord Mute",
         )
         self.add_action_holder(self.mute_action_holder)
@@ -52,7 +52,7 @@ class PluginTemplate(PluginBase):
         self.deafen_action_holder = ActionHolder(
             plugin_base=self,
             action_base=DeafenAction,
-            action_id="com_oparada_DiscordPlugin::DeafenAction",
+            action_id="com_oparada_DiscordSC::DeafenAction",
             action_name="Discord Deafen",
         )
         self.add_action_holder(self.deafen_action_holder)
@@ -60,7 +60,7 @@ class PluginTemplate(PluginBase):
         # Register plugin
         self.register(
             plugin_name="Discord Plugin",
-            github_repo="https://github.com/oparada1988/DiscordPlugin",
+            github_repo="https://github.com/oparada1988/DiscordSC",
             plugin_version="1.0.0",
             app_version="1.1.1-alpha"
         )
