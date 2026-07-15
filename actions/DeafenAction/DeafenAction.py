@@ -19,13 +19,6 @@ class DeafenAction(ActionBase):
         self.is_deaf = False
 
     def on_ready(self) -> None:
-        # Default top label to "Deafen"
-        current_top = self.labels.get("top", {}).get("text", "")
-        if not current_top:
-            self.set_top_label("Deafen")
-        else:
-            self.set_top_label(current_top)
-
         # Register callbacks and event handlers
         self.plugin_base.discord_client.register_connection_callback(self.on_connection_change)
         self.plugin_base.discord_client.register_event_handler("VOICE_SETTINGS_UPDATE", self.on_voice_settings_update)
@@ -35,7 +28,6 @@ class DeafenAction(ActionBase):
 
     def on_connection_change(self, is_connected: bool):
         if not is_connected:
-            GLib.idle_add(self.set_bottom_label, "DISCONN")
             media_path = os.path.join(self.plugin_base.PATH, "assets", "discord.png")
             if os.path.exists(media_path):
                 GLib.idle_add(self.set_media, media_path, 1.0)
@@ -55,10 +47,8 @@ class DeafenAction(ActionBase):
     def update_state(self, is_deaf: bool):
         self.is_deaf = is_deaf
         if is_deaf:
-            GLib.idle_add(self.set_bottom_label, "DEAF")
             media_path = os.path.join(self.plugin_base.PATH, "assets", "deafen.png")
         else:
-            GLib.idle_add(self.set_bottom_label, "ACTIVE")
             media_path = os.path.join(self.plugin_base.PATH, "assets", "undeafen.png")
             
         if os.path.exists(media_path):

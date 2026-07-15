@@ -19,13 +19,6 @@ class MuteAction(ActionBase):
         self.is_muted = False
 
     def on_ready(self) -> None:
-        # Default top label to "Mute"
-        current_top = self.labels.get("top", {}).get("text", "")
-        if not current_top:
-            self.set_top_label("Mute")
-        else:
-            self.set_top_label(current_top)
-
         # Register callbacks and event handlers
         self.plugin_base.discord_client.register_connection_callback(self.on_connection_change)
         self.plugin_base.discord_client.register_event_handler("VOICE_SETTINGS_UPDATE", self.on_voice_settings_update)
@@ -35,7 +28,6 @@ class MuteAction(ActionBase):
 
     def on_connection_change(self, is_connected: bool):
         if not is_connected:
-            GLib.idle_add(self.set_bottom_label, "DISCONN")
             media_path = os.path.join(self.plugin_base.PATH, "assets", "discord.png")
             if os.path.exists(media_path):
                 GLib.idle_add(self.set_media, media_path, 1.0)
@@ -55,10 +47,8 @@ class MuteAction(ActionBase):
     def update_state(self, is_muted: bool):
         self.is_muted = is_muted
         if is_muted:
-            GLib.idle_add(self.set_bottom_label, "MUTED")
             media_path = os.path.join(self.plugin_base.PATH, "assets", "mute.png")
         else:
-            GLib.idle_add(self.set_bottom_label, "ACTIVE")
             media_path = os.path.join(self.plugin_base.PATH, "assets", "unmute.png")
             
         if os.path.exists(media_path):
