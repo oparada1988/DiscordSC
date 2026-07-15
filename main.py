@@ -265,3 +265,7 @@ class PluginTemplate(PluginBase):
         """Cleanup client threads on exit"""
         logger.info("Stopping Discord client background thread...")
         self.discord_client.stop()
+
+    def get_selector_icon(self) -> Gtk.Widget:
+        icon_path = os.path.join(self.PATH, "assets", "icon.png")
+        return Gtk.Image(file=icon_path)
