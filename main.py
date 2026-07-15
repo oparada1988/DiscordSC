@@ -86,7 +86,7 @@ class PluginTemplate(PluginBase):
 
         # Register plugin
         self.register(
-            plugin_name="Discord Plugin",
+            plugin_name="DiscordSC",
             github_repo="https://github.com/oparada1988/DiscordSC",
             plugin_version="1.0.0",
             app_version="1.1.1-alpha"
