@@ -98,6 +98,11 @@ class DiscordIPCClient:
 
     def _run_loop(self):
         while self._running:
+            if not self.client_id:
+                logger.debug("Client ID not configured. Retrying in 5 seconds...")
+                time.sleep(5)
+                continue
+
             if not self.connected:
                 path = self.get_ipc_path()
                 if not path:
@@ -117,6 +122,9 @@ class DiscordIPCClient:
                     
                     # Start reading from the socket
                     self._recv_loop()
+                    
+                    # Connection closed, sleep to prevent hot looping
+                    time.sleep(5)
                 except Exception as e:
                     logger.error(f"Error connecting to Discord IPC: {e}")
                     self._disconnect()
@@ -206,6 +214,9 @@ class DiscordIPCClient:
 
     def _handle_payload(self, op: int, payload: Dict[str, Any]):
         logger.debug(f"Received payload: op={op}, cmd={payload.get('cmd')}, evt={payload.get('evt')}")
+        if op == 2:
+            logger.error(f"Discord closed connection with payload: {payload}")
+
         
         cmd = payload.get("cmd")
         evt = payload.get("evt")
@@ -274,7 +285,8 @@ class DiscordIPCClient:
         
         url = "https://discord.com/api/oauth2/token"
         headers = {
-            "Content-Type": "application/x-www-form-urlencoded"
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
         }
         
         data_dict = {
