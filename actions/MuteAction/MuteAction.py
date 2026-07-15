@@ -30,7 +30,7 @@ class MuteAction(ActionBase):
         if not is_connected:
             media_path = os.path.join(self.plugin_base.PATH, "assets", "discord.png")
             if os.path.exists(media_path):
-                GLib.idle_add(self.set_media, media_path, 1.0)
+                GLib.idle_add(lambda: self.set_media(media_path=media_path, size=1.0))
         else:
             # Fetch current voice settings to sync state
             self.plugin_base.discord_client.get_voice_settings(self.on_voice_settings)
@@ -52,7 +52,7 @@ class MuteAction(ActionBase):
             media_path = os.path.join(self.plugin_base.PATH, "assets", "unmute.png")
             
         if os.path.exists(media_path):
-            GLib.idle_add(self.set_media, media_path, 1.0)
+            GLib.idle_add(lambda: self.set_media(media_path=media_path, size=1.0))
 
     def on_key_down(self) -> None:
         if not self.plugin_base.discord_client.connected or not self.plugin_base.discord_client.authenticated:
