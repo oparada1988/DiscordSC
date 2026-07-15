@@ -97,6 +97,7 @@ class DiscordIPCClient:
         # Connection status callbacks
         self.on_connection_change_callbacks: List[SafeCallback] = []
         self.on_token_refreshed: Optional[Callable[[str], None]] = None
+        self._consecutive_failures = 0
 
 
     def register_connection_callback(self, cb: Callable[[bool], None]):
@@ -184,6 +185,7 @@ class DiscordIPCClient:
             self.authenticated = False
             self.callbacks.clear()
             self._notify_connection_change()
+            self._consecutive_failures = 0
 
     def _connect_flatpak_bridge(self) -> bool:
         if not os.path.exists('/.flatpak-info'):
@@ -255,7 +257,7 @@ class DiscordIPCClient:
             proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             
             # Wait a short duration to verify it didn't exit with code 1 or 2
-            time.sleep(0.2)
+            time.sleep(0.1)
             if proc.poll() is not None:
                 exit_code = proc.returncode
                 err_msg = proc.stderr.read().decode("utf-8", errors="replace")
@@ -270,6 +272,13 @@ class DiscordIPCClient:
         except Exception as e:
             logger.error(f"Error starting Flatpak host bridge: {e}")
             return False
+
+    def _get_retry_delay(self) -> float:
+        # If we have failed less than 30 times (e.g. 30 seconds), poll every 1.0 second.
+        # Otherwise, back off to 5.0 seconds.
+        if self._consecutive_failures < 30:
+            return 1.0
+        return 5.0
 
     def _run_loop(self):
         while self._running:
@@ -290,6 +299,7 @@ class DiscordIPCClient:
                         self.connected = True
                         logger.info(f"Connected to Discord IPC socket directly: {path}")
                         connected_direct = True
+                        self._consecutive_failures = 0
                     except Exception as e:
                         logger.error(f"Error connecting directly to Discord IPC: {e}")
                         self._disconnect()
@@ -297,10 +307,12 @@ class DiscordIPCClient:
                 # If direct connection failed or path wasn't found, try flatpak host bridge
                 if not connected_direct:
                     if self._connect_flatpak_bridge():
-                        pass
+                        self._consecutive_failures = 0
                     else:
-                        logger.debug("Could not connect directly or via Flatpak bridge. Retrying in 5 seconds...")
-                        self._stop_event.wait(5)
+                        self._consecutive_failures += 1
+                        delay = self._get_retry_delay()
+                        logger.debug(f"Could not connect directly or via Flatpak bridge. Retrying in {delay} seconds...")
+                        self._stop_event.wait(delay)
                         continue
                 
                 try:
@@ -311,11 +323,13 @@ class DiscordIPCClient:
                     self._recv_loop()
                     
                     # Connection closed, sleep to prevent hot looping
-                    self._stop_event.wait(5)
+                    delay = self._get_retry_delay()
+                    self._stop_event.wait(delay)
                 except Exception as e:
                     logger.error(f"Exception in Discord client runtime: {e}")
                     self._disconnect()
-                    self._stop_event.wait(5)
+                    delay = self._get_retry_delay()
+                    self._stop_event.wait(delay)
             else:
                 self._stop_event.wait(1)
 
