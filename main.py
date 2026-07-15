@@ -105,39 +105,22 @@ class PluginTemplate(PluginBase):
         redirect_uri_row = Adw.EntryRow(title="Redirect URI")
         redirect_uri_row.set_text(settings.get("redirect_uri", "http://localhost:9000"))
 
-        # Connect entry changes to settings
-        def on_client_id_changed(entry, *args):
-            s = self.get_settings()
-            val = entry.get_text().strip()
-            s["client_id"] = val
-            self.set_settings(s)
-            self.discord_client.client_id = val
-            # Restart client with new credentials if changed
-            self.discord_client._disconnect()
-            
-        def on_client_secret_changed(entry, *args):
-            s = self.get_settings()
-            val = entry.get_text().strip()
-            s["client_secret"] = val
-            self.set_settings(s)
-            self.discord_client.client_secret = val
-
-        def on_redirect_uri_changed(entry, *args):
-            s = self.get_settings()
-            val = entry.get_text().strip()
-            s["redirect_uri"] = val
-            self.set_settings(s)
-            self.discord_client.redirect_uri = val
-
-        client_id_row.connect("notify::text", on_client_id_changed)
-        client_secret_row.connect("notify::text", on_client_secret_changed)
-        redirect_uri_row.connect("notify::text", on_redirect_uri_changed)
-
         group.add(client_id_row)
         group.add(client_secret_row)
         group.add(redirect_uri_row)
 
-        # 4. Authorize action row
+        # 4. Save settings action row
+        save_button = Gtk.Button(label="Save")
+        save_button.set_valign(Gtk.Align.CENTER)
+        
+        save_row = Adw.ActionRow(
+            title="Save Credentials",
+            subtitle="Apply client credentials and reconnect"
+        )
+        save_row.add_suffix(save_button)
+        group.add(save_row)
+
+        # 5. Authorize action row
         auth_button = Gtk.Button(label="Authorize")
         auth_button.set_valign(Gtk.Align.CENTER)
         
@@ -151,8 +134,39 @@ class PluginTemplate(PluginBase):
             subtitle="Request access to control mute and deafen state"
         )
         auth_row.add_suffix(auth_button)
+        group.add(auth_row)
+
+        def save_credentials_ui():
+            c_id = client_id_row.get_text().strip()
+            c_secret = client_secret_row.get_text().strip()
+            r_uri = redirect_uri_row.get_text().strip()
+            
+            s = self.get_settings()
+            changed = (s.get("client_id") != c_id or 
+                       s.get("client_secret") != c_secret or 
+                       s.get("redirect_uri") != r_uri)
+            
+            s["client_id"] = c_id
+            s["client_secret"] = c_secret
+            s["redirect_uri"] = r_uri
+            self.set_settings(s)
+            
+            self.discord_client.client_id = c_id
+            self.discord_client.client_secret = c_secret
+            self.discord_client.redirect_uri = r_uri
+            
+            if changed:
+                logger.info("Credentials changed, reconnecting Discord client...")
+                self.discord_client._disconnect()
+            return changed
+
+        def on_save_clicked(btn):
+            save_credentials_ui()
+            self.show_dialog("Settings Saved", "Credentials saved and client reconnected (if changed)!")
 
         def on_authorize_clicked(btn):
+            save_credentials_ui()
+            
             s = self.get_settings()
             c_id = s.get("client_id", "").strip()
             c_secret = s.get("client_secret", "").strip()
@@ -162,7 +176,7 @@ class PluginTemplate(PluginBase):
                 return
                 
             if not self.discord_client.connected:
-                self.show_dialog("Discord Disconnected", "Please make sure Discord is open and running on your system.")
+                self.show_dialog("Discord Disconnected", "Please make sure Discord is open and running on your system, and give it a few seconds to connect.")
                 return
 
             btn.set_sensitive(False)
@@ -206,17 +220,19 @@ class PluginTemplate(PluginBase):
 
             self.discord_client.authorize(auth_callback)
 
+        save_button.connect("clicked", on_save_clicked)
         auth_button.connect("clicked", on_authorize_clicked)
-        group.add(auth_row)
 
         return group
 
     def save_token(self, token: str):
         """Save refreshed access token to settings"""
-        logger.info("Saving newly refreshed Discord access token to settings...")
-        s = self.get_settings()
-        s["access_token"] = token
-        self.set_settings(s)
+        def run_save():
+            logger.info("Saving newly refreshed Discord access token to settings...")
+            s = self.get_settings()
+            s["access_token"] = token
+            self.set_settings(s)
+        GLib.idle_add(run_save)
 
     def on_close(self):
         """Cleanup client threads on exit"""

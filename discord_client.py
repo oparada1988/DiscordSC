@@ -8,6 +8,7 @@ import threading
 import urllib.request
 import urllib.error
 import subprocess
+import weakref
 from loguru import logger
 from typing import Callable, Dict, List, Any, Optional
 
@@ -40,6 +41,38 @@ class SubprocessSocketWrapper:
         except Exception:
             pass
 
+class SafeCallback:
+    def __init__(self, cb):
+        if hasattr(cb, "__self__") and cb.__self__ is not None:
+            self.target_ref = weakref.ref(cb.__self__)
+            self.func = cb.__func__
+            self.is_method = True
+        else:
+            self.target_ref = weakref.ref(cb)
+            self.func = None
+            self.is_method = False
+
+    def __call__(self, *args, **kwargs):
+        target = self.target_ref()
+        if target is not None:
+            if self.is_method:
+                return self.func(target, *args, **kwargs)
+            else:
+                return target(*args, **kwargs)
+        return None
+
+    def is_alive(self) -> bool:
+        return self.target_ref() is not None
+
+    def matches(self, cb) -> bool:
+        if self.is_method:
+            if hasattr(cb, "__self__") and hasattr(cb, "__func__"):
+                return self.target_ref() is cb.__self__ and self.func is cb.__func__
+            return False
+        else:
+            return self.target_ref() is cb
+
+
 class DiscordIPCClient:
     def __init__(self, client_id: str = "", client_secret: str = "", redirect_uri: str = "http://localhost:9000"):
         self.client_id = client_id
@@ -51,7 +84,7 @@ class DiscordIPCClient:
         self.authenticated = False
         
         self.callbacks: Dict[str, Callable[[Dict[str, Any]], None]] = {}
-        self.event_handlers: Dict[str, List[Callable[[Dict[str, Any]], None]]] = {}
+        self.event_handlers: Dict[str, List[SafeCallback]] = {}
         
         self.access_token: Optional[str] = None
         self.user_data: Dict[str, Any] = {}
@@ -59,18 +92,21 @@ class DiscordIPCClient:
         self._running = False
         self._thread: Optional[threading.Thread] = None
         self._lock = threading.Lock()
+        self._stop_event = threading.Event()
         
         # Connection status callbacks
-        self.on_connection_change_callbacks: List[Callable[[bool], None]] = []
+        self.on_connection_change_callbacks: List[SafeCallback] = []
         self.on_token_refreshed: Optional[Callable[[str], None]] = None
 
 
     def register_connection_callback(self, cb: Callable[[bool], None]):
-        if cb not in self.on_connection_change_callbacks:
-            self.on_connection_change_callbacks.append(cb)
+        self.on_connection_change_callbacks = [c for c in self.on_connection_change_callbacks if c.is_alive()]
+        if not any(c.matches(cb) for c in self.on_connection_change_callbacks):
+            self.on_connection_change_callbacks.append(SafeCallback(cb))
 
     def _notify_connection_change(self):
         status = self.connected and self.authenticated
+        self.on_connection_change_callbacks = [c for c in self.on_connection_change_callbacks if c.is_alive()]
         for cb in self.on_connection_change_callbacks:
             try:
                 cb(status)
@@ -78,37 +114,60 @@ class DiscordIPCClient:
                 logger.error(f"Error calling connection callback: {e}")
 
     def get_ipc_path(self) -> Optional[str]:
+        # Check environment variable override
+        env_path = os.environ.get("DISCORD_IPC_PATH")
+        if env_path and os.path.exists(env_path):
+            logger.debug(f"Found Discord IPC socket via DISCORD_IPC_PATH: {env_path}")
+            return env_path
+
         uid = os.getuid()
-        candidates = [
-            os.path.join(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{uid}"), "discord-ipc-0"),
-            f"/run/user/{uid}/discord-ipc-0",
-            "/tmp/discord-ipc-0",
-            f"/run/user/{uid}/snap.discord/discord-ipc-0",
-            f"/run/user/{uid}/app/com.discordapp.Discord/discord-ipc-0",
+        runtime_dir = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{uid}")
+        
+        # Directories where Discord IPC sockets might reside
+        base_dirs = [
+            runtime_dir,
+            f"/run/user/{uid}",
+            "/tmp",
+            os.path.join(runtime_dir, "snap.discord"),
+            os.path.join(runtime_dir, "snap.discord-canary"),
+            os.path.join(runtime_dir, "snap.discord-ptb"),
+            f"/run/user/{uid}/snap.discord",
+            f"/run/user/{uid}/snap.discord-canary",
+            f"/run/user/{uid}/snap.discord-ptb",
+            os.path.join(runtime_dir, "app/com.discordapp.Discord"),
+            os.path.join(runtime_dir, "app/com.discordapp.DiscordCanary"),
+            os.path.join(runtime_dir, "app/com.discordapp.DiscordPTB"),
+            f"/run/user/{uid}/app/com.discordapp.Discord",
+            f"/run/user/{uid}/app/com.discordapp.DiscordCanary",
+            f"/run/user/{uid}/app/com.discordapp.DiscordPTB",
         ]
-        # Check from 0 to 9 index as well
-        for i in range(1, 10):
-            candidates.append(os.path.join(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{uid}"), f"discord-ipc-{i}"))
-            candidates.append(f"/run/user/{uid}/discord-ipc-{i}")
-            candidates.append(f"/tmp/discord-ipc-{i}")
-            candidates.append(f"/run/user/{uid}/snap.discord/discord-ipc-{i}")
-            candidates.append(f"/run/user/{uid}/app/com.discordapp.Discord/discord-ipc-{i}")
-            
-        for path in candidates:
-            if os.path.exists(path):
-                logger.debug(f"Found Discord IPC socket candidate: {path}")
-                return path
+        
+        # Deduplicate directories preserving order
+        unique_dirs = []
+        for d in base_dirs:
+            if d not in unique_dirs:
+                unique_dirs.append(d)
+                
+        # Look for discord-ipc-0 through discord-ipc-9 in each directory
+        for i in range(10):
+            for base_dir in unique_dirs:
+                path = os.path.join(base_dir, f"discord-ipc-{i}")
+                if os.path.exists(path):
+                    logger.debug(f"Found Discord IPC socket candidate: {path}")
+                    return path
         return None
 
     def start(self):
         if self._running:
             return
         self._running = True
+        self._stop_event.clear()
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
         self._thread.start()
 
     def stop(self):
         self._running = False
+        self._stop_event.set()
         self._disconnect()
         if self._thread:
             self._thread.join(timeout=1.0)
@@ -133,25 +192,40 @@ class DiscordIPCClient:
         logger.info("Attempting to connect via Flatpak host bridge...")
         bridge_code = (
             "import os, socket, sys, threading\n"
-            "uid = os.getuid()\n"
-            "candidates = [\n"
-            "    os.path.join(os.environ.get('XDG_RUNTIME_DIR', f'/run/user/{uid}'), 'discord-ipc-0'),\n"
-            "    f'/run/user/{uid}/discord-ipc-0',\n"
-            "    '/tmp/discord-ipc-0',\n"
-            "    f'/run/user/{uid}/snap.discord/discord-ipc-0',\n"
-            "    f'/run/user/{uid}/app/com.discordapp.Discord/discord-ipc-0',\n"
-            "]\n"
-            "for i in range(1, 10):\n"
-            "    candidates.append(os.path.join(os.environ.get('XDG_RUNTIME_DIR', f'/run/user/{uid}'), f'discord-ipc-{i}'))\n"
-            "    candidates.append(f'/run/user/{uid}/discord-ipc-{i}')\n"
-            "    candidates.append(f'/tmp/discord-ipc-{i}')\n"
-            "    candidates.append(f'/run/user/{uid}/snap.discord/discord-ipc-{i}')\n"
-            "    candidates.append(f'/run/user/{uid}/app/com.discordapp.Discord/discord-ipc-{i}')\n"
-            "path = None\n"
-            "for p in candidates:\n"
-            "    if os.path.exists(p):\n"
-            "        path = p\n"
-            "        break\n"
+            "env_path = os.environ.get('DISCORD_IPC_PATH')\n"
+            "if env_path and os.path.exists(env_path):\n"
+            "    path = env_path\n"
+            "else:\n"
+            "    uid = os.getuid()\n"
+            "    runtime_dir = os.environ.get('XDG_RUNTIME_DIR', f'/run/user/{uid}')\n"
+            "    base_dirs = [\n"
+            "        runtime_dir,\n"
+            "        f'/run/user/{uid}',\n"
+            "        '/tmp',\n"
+            "        os.path.join(runtime_dir, 'snap.discord'),\n"
+            "        os.path.join(runtime_dir, 'snap.discord-canary'),\n"
+            "        os.path.join(runtime_dir, 'snap.discord-ptb'),\n"
+            "        f'/run/user/{uid}/snap.discord',\n"
+            "        f'/run/user/{uid}/snap.discord-canary',\n"
+            "        f'/run/user/{uid}/snap.discord-ptb',\n"
+            "        os.path.join(runtime_dir, 'app/com.discordapp.Discord'),\n"
+            "        os.path.join(runtime_dir, 'app/com.discordapp.DiscordCanary'),\n"
+            "        os.path.join(runtime_dir, 'app/com.discordapp.DiscordPTB'),\n"
+            "        f'/run/user/{uid}/app/com.discordapp.Discord',\n"
+            "        f'/run/user/{uid}/app/com.discordapp.DiscordCanary',\n"
+            "        f'/run/user/{uid}/app/com.discordapp.DiscordPTB',\n"
+            "    ]\n"
+            "    unique_dirs = []\n"
+            "    for d in base_dirs:\n"
+            "        if d not in unique_dirs: unique_dirs.append(d)\n"
+            "    path = None\n"
+            "    for i in range(10):\n"
+            "        for bd in unique_dirs:\n"
+            "            p = os.path.join(bd, f'discord-ipc-{i}')\n"
+            "            if os.path.exists(p):\n"
+            "                path = p\n"
+            "                break\n"
+            "        if path: break\n"
             "if not path:\n"
             "    sys.exit(1)\n"
             "try:\n"
@@ -201,7 +275,7 @@ class DiscordIPCClient:
         while self._running:
             if not self.client_id:
                 logger.debug("Client ID not configured. Retrying in 5 seconds...")
-                time.sleep(5)
+                self._stop_event.wait(5)
                 continue
 
             if not self.connected:
@@ -226,7 +300,7 @@ class DiscordIPCClient:
                         pass
                     else:
                         logger.debug("Could not connect directly or via Flatpak bridge. Retrying in 5 seconds...")
-                        time.sleep(5)
+                        self._stop_event.wait(5)
                         continue
                 
                 try:
@@ -237,13 +311,13 @@ class DiscordIPCClient:
                     self._recv_loop()
                     
                     # Connection closed, sleep to prevent hot looping
-                    time.sleep(5)
+                    self._stop_event.wait(5)
                 except Exception as e:
                     logger.error(f"Exception in Discord client runtime: {e}")
                     self._disconnect()
-                    time.sleep(5)
+                    self._stop_event.wait(5)
             else:
-                time.sleep(1)
+                self._stop_event.wait(1)
 
     def _send_handshake(self):
         payload = {
@@ -366,6 +440,7 @@ class DiscordIPCClient:
         # Trigger event handlers
         if cmd == "DISPATCH" and evt:
             if evt in self.event_handlers:
+                self.event_handlers[evt] = [h for h in self.event_handlers[evt] if h.is_alive()]
                 for handler in self.event_handlers[evt]:
                     try:
                         handler(data)
@@ -506,7 +581,9 @@ class DiscordIPCClient:
     def register_event_handler(self, event: str, handler: Callable[[Dict[str, Any]], None]):
         if event not in self.event_handlers:
             self.event_handlers[event] = []
-        self.event_handlers[event].append(handler)
+        self.event_handlers[event] = [h for h in self.event_handlers[event] if h.is_alive()]
+        if not any(h.matches(handler) for h in self.event_handlers[event]):
+            self.event_handlers[event].append(SafeCallback(handler))
 
     def get_voice_settings(self, callback: Callable[[Dict[str, Any]], None]):
         """Get voice settings"""
