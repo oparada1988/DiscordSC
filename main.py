@@ -15,6 +15,9 @@ from gi.repository import Gtk, Adw, GLib
 from .discord_client import DiscordIPCClient
 from .actions.MuteAction.MuteAction import MuteAction
 from .actions.DeafenAction.DeafenAction import DeafenAction
+from .actions.TextChannelAction.TextChannelAction import TextChannelAction
+from .actions.VoiceChannelAction.VoiceChannelAction import VoiceChannelAction
+from .actions.PushToTalkAction.PushToTalkAction import PushToTalkAction
 
 class PluginTemplate(PluginBase):
     def __init__(self):
@@ -56,6 +59,30 @@ class PluginTemplate(PluginBase):
             action_name="Discord Deafen",
         )
         self.add_action_holder(self.deafen_action_holder)
+
+        self.text_channel_action_holder = ActionHolder(
+            plugin_base=self,
+            action_base=TextChannelAction,
+            action_id="com_oparada_DiscordSC::TextChannelAction",
+            action_name="Text Channel Switch",
+        )
+        self.add_action_holder(self.text_channel_action_holder)
+
+        self.voice_channel_action_holder = ActionHolder(
+            plugin_base=self,
+            action_base=VoiceChannelAction,
+            action_id="com_oparada_DiscordSC::VoiceChannelAction",
+            action_name="Voice Channel Switch",
+        )
+        self.add_action_holder(self.voice_channel_action_holder)
+
+        self.push_to_talk_action_holder = ActionHolder(
+            plugin_base=self,
+            action_base=PushToTalkAction,
+            action_id="com_oparada_DiscordSC::PushToTalkAction",
+            action_name="Push to Talk",
+        )
+        self.add_action_holder(self.push_to_talk_action_holder)
 
         # Register plugin
         self.register(

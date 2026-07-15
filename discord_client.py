@@ -598,3 +598,17 @@ class DiscordIPCClient:
             args["deaf"] = deaf
             
         self.send_command("SET_VOICE_SETTINGS", args=args, callback=callback)
+
+    def select_voice_channel(self, channel_id: Optional[str] = None, callback: Optional[Callable[[Dict[str, Any]], None]] = None):
+        """Join or leave a voice channel"""
+        args = {
+            "channel_id": channel_id
+        }
+        self.send_command("SELECT_VOICE_CHANNEL", args=args, callback=callback)
+
+    def select_text_channel(self, channel_id: Optional[str] = None, callback: Optional[Callable[[Dict[str, Any]], None]] = None):
+        """Select a text channel"""
+        args = {
+            "channel_id": channel_id
+        }
+        self.send_command("SELECT_TEXT_CHANNEL", args=args, callback=callback)
