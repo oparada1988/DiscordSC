@@ -109,7 +109,8 @@ class TextChannelAction(ActionBase):
                 try:
                     data = payload.get("data", {})
                     guilds = data.get("guilds", [])
-                    self.guilds_map = [(g.get("id"), g.get("name")) for g in guilds]
+                    guilds_sorted = sorted(guilds, key=lambda g: g.get("name", "").lower())
+                    self.guilds_map = [(g.get("id"), g.get("name")) for g in guilds_sorted]
                     
                     self.guild_model = Gtk.StringList()
                     if not self.guilds_map:
@@ -164,7 +165,8 @@ class TextChannelAction(ActionBase):
                     
                     # Filter for text channels (type 0) and announcement/news channels (type 5)
                     filtered = [c for c in channels if c.get("type") in [0, 5]]
-                    self.channels_map = [(c.get("id"), c.get("name")) for c in filtered]
+                    filtered_sorted = sorted(filtered, key=lambda c: c.get("name", "").lower())
+                    self.channels_map = [(c.get("id"), c.get("name")) for c in filtered_sorted]
                     
                     self.channel_model = Gtk.StringList()
                     if not self.channels_map:
