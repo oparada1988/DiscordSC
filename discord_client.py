@@ -184,7 +184,9 @@ class DiscordIPCClient:
             time.sleep(0.2)
             if proc.poll() is not None:
                 exit_code = proc.returncode
-                logger.warning(f"Flatpak host bridge process exited immediately with code {exit_code}")
+                err_msg = proc.stderr.read().decode("utf-8", errors="replace")
+                out_msg = proc.stdout.read().decode("utf-8", errors="replace")
+                logger.warning(f"Flatpak host bridge process exited immediately with code {exit_code}. Stderr: {err_msg.strip()}. Stdout: {out_msg.strip()}")
                 return False
                 
             self.sock = SubprocessSocketWrapper(proc)
