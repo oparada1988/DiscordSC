@@ -28,7 +28,7 @@ class DeafenAction(ActionBase):
 
     def on_connection_change(self, is_connected: bool):
         if not is_connected:
-            media_path = os.path.join(self.plugin_base.PATH, "assets", "discord.png")
+            media_path = os.path.join(self.plugin_base.PATH, "assets", "deafen_disconnected.png")
             if os.path.exists(media_path):
                 GLib.idle_add(lambda: self.set_media(media_path=media_path, size=1.0))
         else:
