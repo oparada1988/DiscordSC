@@ -1,44 +1,42 @@
 # Discord Plugin for StreamController
 
-This plugin allows you to control your Discord client's mute and deafen state directly from your StreamController deck. It utilizes the local Discord RPC socket to establish a bi-directional communication, ensuring your deck keys update in real-time if you mute/unmute via keyboard shortcuts or within the Discord app itself.
+![Discord Plugin Thumbnail](assets/thumbnail.png)
+
+Control your Discord client's mute, deafen, and voice channel state directly from your StreamController deck. This plugin uses Discord's local IPC/RPC socket for bi-directional, real-time sync.
 
 ## Features
-
-- **Discord Mute Action**: Toggle microphone mute state. Displays dynamic status ("MUTED" / "ACTIVE") and sleek neon icons.
-- **Discord Deafen Action**: Toggle audio deafen state. Displays dynamic status ("DEAF" / "ACTIVE") and sleek neon icons.
-- **Real-time State Sync**: Full bi-directional status updates via Discord's local RPC event subscription (`VOICE_SETTINGS_UPDATE`).
-- **Connection Recovery**: Auto-reconnects when Discord is launched, closed, or restarted.
+- **Mute & Deafen Toggle**: Toggle states with dynamic status displays and custom neon icons.
+- **Channel Switching**: Quick-switch between voice and text channels.
+- **Bi-directional Sync**: Real-time button status updates via Discord's `VOICE_SETTINGS_UPDATE` events.
+- **Robust Connection**: Auto-recovery and Flatpak sandbox bridge support.
 
 ## Setup Instructions
 
 ### 1. Create a Discord Developer Application
 1. Go to the [Discord Developer Portal](https://discord.com/developers/applications).
-2. Click **New Application** at the top right and give it a name (e.g. `StreamController`).
-3. Go to the **OAuth2** tab on the left sidebar.
-4. Under **Redirects**, click **Add Redirect** and enter:
-   `http://localhost:9000`
-5. Click **Save Changes** at the bottom of the screen.
+2. Click **New Application** and enter a name (e.g., `StreamController`).
+3. Under the **OAuth2** tab, click **Add Redirect** and enter `http://localhost:9000`.
+4. Click **Save Changes**.
 
-### 2. Configure Plugin Settings in StreamController
-1. Open StreamController and go to the settings page for the **Discord Plugin**.
-2. Copy the **Client ID** from your Discord Developer Portal application (found on the **General Information** page) and paste it into the **Client ID** field.
-3. Copy the **Client Secret** (found on the **OAuth2** page by clicking **Reset Secret**) and paste it into the **Client Secret** field.
-4. Leave the **Redirect URI** as `http://localhost:9000` (or update it if you registered a custom redirect URI).
+### 2. Configure Plugin Settings
+1. Open StreamController settings for **Discord Plugin**.
+2. Copy the **Client ID** from your application's **General Information** page and paste it.
+3. Reset and copy the **Client Secret** from the **OAuth2** page and paste it.
+4. Keep the **Redirect URI** as `http://localhost:9000` (or your custom redirected URI).
+5. Click **Save**.
 
 ### 3. Authorize the Plugin
-1. Ensure your Discord desktop app is running.
-2. Click the **Authorize** button in the StreamController Discord plugin settings.
-3. A popup will appear in your Discord client asking you to authorize the application.
-4. Click **Authorize** in Discord.
-5. StreamController will automatically complete the token exchange and authenticate. The button will change to **Re-Authorize** to confirm a successful link!
+1. Make sure your Discord desktop app is running.
+2. Click **Authorize** in the StreamController Discord plugin settings.
+3. Click **Authorize** in the Discord prompt to grant permissions.
+4. The button in StreamController will change to **Re-Authorize** upon successful pairing.
 
 ## Troubleshooting
+- **DISCONN on keys**: Verify Discord is running. If StreamController runs in Flatpak, grant socket permissions:
+  ```bash
+  flatpak override --filesystem=xdg-run/discord-ipc-* com.core447.StreamController
+  ```
+- **Auth Failure**: Verify Client ID/Secret and Redirect URI settings match the developer portal exactly.
 
-- **DISCONN displayed on keys**: This means the plugin is unable to find the Discord local socket. Make sure the Discord desktop app is open.
-  - **Flatpak Sandbox Fix**: If you run StreamController as a Flatpak, it may be blocked from accessing the host's Discord socket. You can grant access by running:
-    ```bash
-    flatpak override --filesystem=xdg-run/discord-ipc-* com.core447.StreamController
-    ```
-    Then, restart StreamController.
-- **Authorization fails**: Double-check your Client ID and Client Secret, and verify that the Redirect URI in the settings matches your registered Redirect URI exactly.
-
+---
+Notice: Plugin was written/updated with assistance of Google Antigravity

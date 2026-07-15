@@ -1,7 +1,7 @@
 {
     "version": "1.0.0",
     "author": "oparada1988",
-    "thumbnail": "assets/discord.png",
+    "thumbnail": "assets/thumbnail.png",
     "id": "com_oparada_DiscordSC",
     "name": "Discord Plugin",
     "descriptions": {
