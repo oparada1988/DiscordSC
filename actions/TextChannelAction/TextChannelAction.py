@@ -77,6 +77,17 @@ class TextChannelAction(ActionBase):
         # Trigger initial loading of servers
         self.load_guilds()
 
+        # Clean up references on widget destroy to prevent memory leaks/crashes
+        def on_destroy(widget):
+            self.guild_selector = None
+            self.channel_selector = None
+            self.guild_model = None
+            self.channel_model = None
+            self.guilds_map = []
+            self.channels_map = []
+
+        self.guild_selector.connect("destroy", on_destroy)
+
         return [self.guild_selector, self.channel_selector]
 
     def load_guilds(self):
