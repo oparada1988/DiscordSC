@@ -18,6 +18,19 @@ class PushToTalkAction(ActionBase):
         super().__init__(*args, **kwargs)
 
     def on_ready(self) -> None:
+        # Ensure we have image control so our icon is displayed by default
+        try:
+            state = self.get_state()
+            if state is not None:
+                apm = state.action_permission_manager
+                own_index = self.get_own_action_index()
+                if own_index is not None and own_index != -1:
+                    if apm.get_image_control_index() is None or not self.get_is_multi_action():
+                        if apm.get_image_control_index() != own_index:
+                            apm.set_image_control_index(own_index, reload_pages=False, reload_self=False)
+        except Exception as e:
+            logger.error(f"Error ensuring image control: {e}")
+
         # Register callbacks and event handlers
         self.plugin_base.discord_client.register_connection_callback(self.on_connection_change)
 
