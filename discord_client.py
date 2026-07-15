@@ -32,6 +32,8 @@ class DiscordIPCClient:
         
         # Connection status callbacks
         self.on_connection_change_callbacks: List[Callable[[bool], None]] = []
+        self.on_token_refreshed: Optional[Callable[[str], None]] = None
+
 
     def register_connection_callback(self, cb: Callable[[bool], None]):
         if cb not in self.on_connection_change_callbacks:
@@ -217,7 +219,14 @@ class DiscordIPCClient:
             # If we already have an access token, try to authenticate immediately
             if self.access_token:
                 logger.info("Found saved access token, authenticating...")
-                self.authenticate(self.access_token)
+                def on_auth_done(success):
+                    if not success:
+                        logger.warning("Saved access token failed to authenticate. Attempting auto-authorization...")
+                        self.auto_authorize()
+                self.authenticate(self.access_token, on_auth_done)
+            elif self.client_id and self.client_secret:
+                logger.info("No saved access token but credentials present. Attempting auto-authorization...")
+                self.auto_authorize()
             else:
                 # Otherwise notify connection change so main plugin knows we're ready for authorize
                 self._notify_connection_change()
@@ -299,6 +308,44 @@ class DiscordIPCClient:
                 callback(None)
 
         threading.Thread(target=run_exchange, daemon=True).start()
+
+    def auto_authorize(self):
+        """Auto-authorize app silently in the background if already authorized, or prompt user if not"""
+        if not self.client_id or not self.client_secret:
+            logger.warning("Auto-authorization skipped: missing Client ID or Client Secret.")
+            self._notify_connection_change()
+            return
+            
+        logger.info("Running auto-authorization sequence...")
+        
+        def auth_callback(code):
+            if not code:
+                logger.error("Auto-authorization failed: did not receive code from Discord.")
+                self._notify_connection_change()
+                return
+                
+            def token_callback(token):
+                if not token:
+                    logger.error("Auto-authorization token exchange failed.")
+                    self._notify_connection_change()
+                    return
+                
+                logger.info("Auto-authorization token received. Updating and authenticating...")
+                self.access_token = token
+                
+                # Notify main plugin to save token in settings
+                if self.on_token_refreshed:
+                    try:
+                        self.on_token_refreshed(token)
+                    except Exception as e:
+                        logger.error(f"Error calling on_token_refreshed: {e}")
+                        
+                self.authenticate(token)
+                
+            self.token_exchange(code, token_callback)
+            
+        self.authorize(auth_callback)
+
 
     def authenticate(self, token: str, callback: Optional[Callable[[bool], None]] = None):
         """Authenticate connection using access token"""

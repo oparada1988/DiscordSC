@@ -35,6 +35,7 @@ class PluginTemplate(PluginBase):
         )
         if access_token:
             self.discord_client.access_token = access_token
+        self.discord_client.on_token_refreshed = self.save_token
             
         # Start background client loop
         self.discord_client.start()
@@ -209,6 +210,13 @@ class PluginTemplate(PluginBase):
         group.add(auth_row)
 
         return group
+
+    def save_token(self, token: str):
+        """Save refreshed access token to settings"""
+        logger.info("Saving newly refreshed Discord access token to settings...")
+        s = self.get_settings()
+        s["access_token"] = token
+        self.set_settings(s)
 
     def on_close(self):
         """Cleanup client threads on exit"""
