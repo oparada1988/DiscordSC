@@ -7,8 +7,38 @@ import time
 import threading
 import urllib.request
 import urllib.error
+import subprocess
 from loguru import logger
 from typing import Callable, Dict, List, Any, Optional
+
+class SubprocessSocketWrapper:
+    def __init__(self, process: subprocess.Popen):
+        self.process = process
+
+    def sendall(self, data: bytes):
+        self.process.stdin.write(data)
+        self.process.stdin.flush()
+
+    def recv(self, size: int) -> bytes:
+        return self.process.stdout.read(size)
+
+    def close(self):
+        try:
+            self.process.stdin.close()
+        except Exception:
+            pass
+        try:
+            self.process.stdout.close()
+        except Exception:
+            pass
+        try:
+            self.process.terminate()
+        except Exception:
+            pass
+        try:
+            self.process.wait(timeout=0.5)
+        except Exception:
+            pass
 
 class DiscordIPCClient:
     def __init__(self, client_id: str = "", client_secret: str = "", redirect_uri: str = "http://localhost:9000"):
@@ -96,6 +126,75 @@ class DiscordIPCClient:
             self.callbacks.clear()
             self._notify_connection_change()
 
+    def _connect_flatpak_bridge(self) -> bool:
+        if not os.path.exists('/.flatpak-info'):
+            return False
+            
+        logger.info("Attempting to connect via Flatpak host bridge...")
+        bridge_code = (
+            "import os, socket, sys, threading\n"
+            "uid = os.getuid()\n"
+            "candidates = [\n"
+            "    os.path.join(os.environ.get('XDG_RUNTIME_DIR', f'/run/user/{uid}'), 'discord-ipc-0'),\n"
+            "    f'/run/user/{uid}/discord-ipc-0',\n"
+            "    '/tmp/discord-ipc-0',\n"
+            "    f'/run/user/{uid}/snap.discord/discord-ipc-0',\n"
+            "    f'/run/user/{uid}/app/com.discordapp.Discord/discord-ipc-0',\n"
+            "]\n"
+            "for i in range(1, 10):\n"
+            "    candidates.append(os.path.join(os.environ.get('XDG_RUNTIME_DIR', f'/run/user/{uid}'), f'discord-ipc-{i}'))\n"
+            "    candidates.append(f'/run/user/{uid}/discord-ipc-{i}')\n"
+            "    candidates.append(f'/tmp/discord-ipc-{i}')\n"
+            "    candidates.append(f'/run/user/{uid}/snap.discord/discord-ipc-{i}')\n"
+            "    candidates.append(f'/run/user/{uid}/app/com.discordapp.Discord/discord-ipc-{i}')\n"
+            "path = None\n"
+            "for p in candidates:\n"
+            "    if os.path.exists(p):\n"
+            "        path = p\n"
+            "        break\n"
+            "if not path:\n"
+            "    sys.exit(1)\n"
+            "try:\n"
+            "    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)\n"
+            "    sock.connect(path)\n"
+            "except Exception:\n"
+            "    sys.exit(2)\n"
+            "def pipe_in():\n"
+            "    try:\n"
+            "        while True:\n"
+            "            d = os.read(0, 4096)\n"
+            "            if not d: break\n"
+            "            sock.sendall(d)\n"
+            "    except: pass\n"
+            "t = threading.Thread(target=pipe_in, daemon=True)\n"
+            "t.start()\n"
+            "try:\n"
+            "    while True:\n"
+            "        d = sock.recv(4096)\n"
+            "        if not d: break\n"
+            "        os.write(1, d)\n"
+            "except: pass\n"
+        )
+        
+        try:
+            cmd = ["flatpak-spawn", "--host", "python3", "-c", bridge_code]
+            proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            
+            # Wait a short duration to verify it didn't exit with code 1 or 2
+            time.sleep(0.2)
+            if proc.poll() is not None:
+                exit_code = proc.returncode
+                logger.warning(f"Flatpak host bridge process exited immediately with code {exit_code}")
+                return False
+                
+            self.sock = SubprocessSocketWrapper(proc)
+            self.connected = True
+            logger.info("Connected to Discord IPC via Flatpak host bridge.")
+            return True
+        except Exception as e:
+            logger.error(f"Error starting Flatpak host bridge: {e}")
+            return False
+
     def _run_loop(self):
         while self._running:
             if not self.client_id:
@@ -104,19 +203,31 @@ class DiscordIPCClient:
                 continue
 
             if not self.connected:
+                # Try direct connection first
                 path = self.get_ipc_path()
-                if not path:
-                    logger.debug("Discord IPC socket not found. Retrying in 5 seconds...")
-                    time.sleep(5)
-                    continue
+                connected_direct = False
+                if path:
+                    try:
+                        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                        sock.connect(path)
+                        self.sock = sock
+                        self.connected = True
+                        logger.info(f"Connected to Discord IPC socket directly: {path}")
+                        connected_direct = True
+                    except Exception as e:
+                        logger.error(f"Error connecting directly to Discord IPC: {e}")
+                        self._disconnect()
+
+                # If direct connection failed or path wasn't found, try flatpak host bridge
+                if not connected_direct:
+                    if self._connect_flatpak_bridge():
+                        pass
+                    else:
+                        logger.debug("Could not connect directly or via Flatpak bridge. Retrying in 5 seconds...")
+                        time.sleep(5)
+                        continue
                 
                 try:
-                    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-                    sock.connect(path)
-                    self.sock = sock
-                    self.connected = True
-                    logger.info(f"Connected to Discord IPC socket: {path}")
-                    
                     # Handshake
                     self._send_handshake()
                     
@@ -126,7 +237,7 @@ class DiscordIPCClient:
                     # Connection closed, sleep to prevent hot looping
                     time.sleep(5)
                 except Exception as e:
-                    logger.error(f"Error connecting to Discord IPC: {e}")
+                    logger.error(f"Exception in Discord client runtime: {e}")
                     self._disconnect()
                     time.sleep(5)
             else:
