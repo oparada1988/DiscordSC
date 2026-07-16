@@ -51,6 +51,7 @@ class PluginTemplate(PluginBase):
             action_base=MuteAction,
             action_id="com_oparada_DiscordSC::MuteAction",
             action_name="Discord Mute",
+            icon=Gtk.Image(file=os.path.join(self.PATH, "assets", "action-mute.png")),
             action_support={
                 Input.Key: ActionInputSupport.SUPPORTED,
                 Input.Dial: ActionInputSupport.UNTESTED,
@@ -64,6 +65,7 @@ class PluginTemplate(PluginBase):
             action_base=DeafenAction,
             action_id="com_oparada_DiscordSC::DeafenAction",
             action_name="Discord Deafen",
+            icon=Gtk.Image(file=os.path.join(self.PATH, "assets", "action-deafen.png")),
             action_support={
                 Input.Key: ActionInputSupport.SUPPORTED,
                 Input.Dial: ActionInputSupport.UNTESTED,
@@ -77,6 +79,7 @@ class PluginTemplate(PluginBase):
             action_base=TextChannelAction,
             action_id="com_oparada_DiscordSC::TextChannelAction",
             action_name="Text Channel Switch",
+            icon=Gtk.Image(file=os.path.join(self.PATH, "assets", "action-text-channel.png")),
             action_support={
                 Input.Key: ActionInputSupport.SUPPORTED,
                 Input.Dial: ActionInputSupport.UNTESTED,
@@ -90,6 +93,7 @@ class PluginTemplate(PluginBase):
             action_base=VoiceChannelAction,
             action_id="com_oparada_DiscordSC::VoiceChannelAction",
             action_name="Voice Channel Switch",
+            icon=Gtk.Image(file=os.path.join(self.PATH, "assets", "action-voice-channel.png")),
             action_support={
                 Input.Key: ActionInputSupport.SUPPORTED,
                 Input.Dial: ActionInputSupport.UNTESTED,
@@ -103,6 +107,7 @@ class PluginTemplate(PluginBase):
             action_base=PushToTalkAction,
             action_id="com_oparada_DiscordSC::PushToTalkAction",
             action_name="Push to Talk",
+            icon=Gtk.Image(file=os.path.join(self.PATH, "assets", "action-push-to-talk.png")),
             action_support={
                 Input.Key: ActionInputSupport.SUPPORTED,
                 Input.Dial: ActionInputSupport.UNTESTED,
