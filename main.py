@@ -1,6 +1,8 @@
 # Import StreamController modules
 from src.backend.PluginManager.PluginBase import PluginBase
 from src.backend.PluginManager.ActionHolder import ActionHolder
+from src.backend.PluginManager.ActionInputSupport import ActionInputSupport
+from src.backend.DeckManagement.InputIdentifier import Input
 
 # Import python & gtk modules
 import os
@@ -49,6 +51,11 @@ class PluginTemplate(PluginBase):
             action_base=MuteAction,
             action_id="com_oparada_DiscordSC::MuteAction",
             action_name="Discord Mute",
+            action_support={
+                Input.Key: ActionInputSupport.SUPPORTED,
+                Input.Dial: ActionInputSupport.UNTESTED,
+                Input.Touchscreen: ActionInputSupport.UNTESTED
+            }
         )
         self.add_action_holder(self.mute_action_holder)
 
@@ -57,6 +64,11 @@ class PluginTemplate(PluginBase):
             action_base=DeafenAction,
             action_id="com_oparada_DiscordSC::DeafenAction",
             action_name="Discord Deafen",
+            action_support={
+                Input.Key: ActionInputSupport.SUPPORTED,
+                Input.Dial: ActionInputSupport.UNTESTED,
+                Input.Touchscreen: ActionInputSupport.UNTESTED
+            }
         )
         self.add_action_holder(self.deafen_action_holder)
 
@@ -65,6 +77,11 @@ class PluginTemplate(PluginBase):
             action_base=TextChannelAction,
             action_id="com_oparada_DiscordSC::TextChannelAction",
             action_name="Text Channel Switch",
+            action_support={
+                Input.Key: ActionInputSupport.SUPPORTED,
+                Input.Dial: ActionInputSupport.UNTESTED,
+                Input.Touchscreen: ActionInputSupport.UNTESTED
+            }
         )
         self.add_action_holder(self.text_channel_action_holder)
 
@@ -73,6 +90,11 @@ class PluginTemplate(PluginBase):
             action_base=VoiceChannelAction,
             action_id="com_oparada_DiscordSC::VoiceChannelAction",
             action_name="Voice Channel Switch",
+            action_support={
+                Input.Key: ActionInputSupport.SUPPORTED,
+                Input.Dial: ActionInputSupport.UNTESTED,
+                Input.Touchscreen: ActionInputSupport.UNTESTED
+            }
         )
         self.add_action_holder(self.voice_channel_action_holder)
 
@@ -81,6 +103,11 @@ class PluginTemplate(PluginBase):
             action_base=PushToTalkAction,
             action_id="com_oparada_DiscordSC::PushToTalkAction",
             action_name="Push to Talk",
+            action_support={
+                Input.Key: ActionInputSupport.SUPPORTED,
+                Input.Dial: ActionInputSupport.UNTESTED,
+                Input.Touchscreen: ActionInputSupport.UNTESTED
+            }
         )
         self.add_action_holder(self.push_to_talk_action_holder)
 
