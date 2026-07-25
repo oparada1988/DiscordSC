@@ -31,6 +31,7 @@ class PluginTemplate(PluginBase):
         client_secret = settings.get("client_secret", "")
         redirect_uri = settings.get("redirect_uri", "http://localhost:9000")
         access_token = settings.get("access_token", "")
+        refresh_token = settings.get("refresh_token", "")
 
         # Initialize Discord Client
         self.discord_client = DiscordIPCClient(
@@ -40,7 +41,9 @@ class PluginTemplate(PluginBase):
         )
         if access_token:
             self.discord_client.access_token = access_token
-        self.discord_client.on_token_refreshed = self.save_token
+        if refresh_token:
+            self.discord_client.refresh_token = refresh_token
+        self.discord_client.on_token_refreshed = self.save_tokens
             
         # Start background client loop
         self.discord_client.start()
@@ -249,18 +252,24 @@ class PluginTemplate(PluginBase):
                     return
                 
                 # Code received, perform token exchange
-                def token_callback(token):
+                def token_callback(token, refresh_token):
                     if not token:
                         self.show_dialog("Token Exchange Failed", "Failed to retrieve access token. Check Client Secret and Redirect URI settings.")
                         GLib.idle_add(btn.set_sensitive, True)
                         GLib.idle_add(btn.set_label, "Authorize")
                         return
                     
-                    # Store access token
+                    # Store access token and refresh token
                     new_settings = self.get_settings()
                     new_settings["access_token"] = token
+                    if refresh_token:
+                        new_settings["refresh_token"] = refresh_token
                     self.set_settings(new_settings)
                     
+                    self.discord_client.access_token = token
+                    if refresh_token:
+                        self.discord_client.refresh_token = refresh_token
+
                     # Authenticate client
                     def auth_done(success):
                         if success:
@@ -284,12 +293,14 @@ class PluginTemplate(PluginBase):
 
         return group
 
-    def save_token(self, token: str):
-        """Save refreshed access token to settings"""
+    def save_tokens(self, access_token: str, refresh_token: Optional[str] = None):
+        """Save refreshed access token and refresh token to settings"""
         def run_save():
-            logger.info("Saving newly refreshed Discord access token to settings...")
+            logger.info("Saving newly refreshed Discord access and refresh tokens to settings...")
             s = self.get_settings()
-            s["access_token"] = token
+            s["access_token"] = access_token
+            if refresh_token:
+                s["refresh_token"] = refresh_token
             self.set_settings(s)
         GLib.idle_add(run_save)
 

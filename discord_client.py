@@ -87,6 +87,7 @@ class DiscordIPCClient:
         self.event_handlers: Dict[str, List[SafeCallback]] = {}
         
         self.access_token: Optional[str] = None
+        self.refresh_token: Optional[str] = None
         self.user_data: Dict[str, Any] = {}
         
         self._running = False
@@ -96,7 +97,7 @@ class DiscordIPCClient:
         
         # Connection status callbacks
         self.on_connection_change_callbacks: List[SafeCallback] = []
-        self.on_token_refreshed: Optional[Callable[[str], None]] = None
+        self.on_token_refreshed: Optional[Callable[[str, Optional[str]], None]] = None
         self._consecutive_failures = 0
 
 
@@ -433,9 +434,16 @@ class DiscordIPCClient:
                 logger.info("Found saved access token, authenticating...")
                 def on_auth_done(success):
                     if not success:
-                        logger.warning("Saved access token failed to authenticate. Attempting auto-authorization...")
-                        self.auto_authorize()
+                        if self.refresh_token and self.client_id and self.client_secret:
+                            logger.info("Saved access token failed to authenticate. Attempting silent refresh with refresh_token...")
+                            self.refresh_token_exchange()
+                        else:
+                            logger.warning("Saved access token failed to authenticate. Attempting auto-authorization...")
+                            self.auto_authorize()
                 self.authenticate(self.access_token, on_auth_done)
+            elif self.refresh_token and self.client_id and self.client_secret:
+                logger.info("No saved access token but refresh token present. Refreshing access token...")
+                self.refresh_token_exchange()
             elif self.client_id and self.client_secret:
                 logger.info("No saved access token but credentials present. Attempting auto-authorization...")
                 self.auto_authorize()
@@ -481,8 +489,8 @@ class DiscordIPCClient:
                 
         self.send_command("AUTHORIZE", args=args, callback=on_auth_response)
 
-    def token_exchange(self, code: str, callback: Callable[[Optional[str]], None]):
-        """Exchange authorization code for access token via HTTP POST"""
+    def token_exchange(self, code: str, callback: Callable[[Optional[str], Optional[str]], None]):
+        """Exchange authorization code for access token & refresh token via HTTP POST"""
         logger.info("Exchanging code for access token...")
         
         url = "https://discord.com/api/oauth2/token"
@@ -507,21 +515,105 @@ class DiscordIPCClient:
                 with urllib.request.urlopen(req, timeout=10) as response:
                     res_data = response.read().decode("utf-8")
                     parsed = json.loads(res_data)
-                    token = parsed.get("access_token")
-                    logger.info("Access token received successfully.")
-                    callback(token)
+                    access_token = parsed.get("access_token")
+                    refresh_token = parsed.get("refresh_token")
+                    logger.info("Access token and refresh token received successfully.")
+                    callback(access_token, refresh_token)
             except urllib.error.HTTPError as e:
                 try:
                     err_content = e.read().decode("utf-8")
                 except Exception:
                     err_content = ""
                 logger.error(f"HTTP Error {e.code} during token exchange: {err_content or e.reason}")
-                callback(None)
+                callback(None, None)
             except Exception as e:
                 logger.error(f"Error exchanging code: {e}")
-                callback(None)
+                callback(None, None)
 
         threading.Thread(target=run_exchange, daemon=True).start()
+
+    def refresh_token_exchange(self, callback: Optional[Callable[[bool], None]] = None):
+        """Use stored refresh_token to silently obtain a new access_token without user interaction"""
+        if not self.refresh_token or not self.client_id or not self.client_secret:
+            logger.warning("Token refresh skipped: missing refresh_token or client credentials.")
+            if callback:
+                callback(False)
+            return
+
+        logger.info("Refreshing access token silently using refresh token...")
+
+        url = "https://discord.com/api/oauth2/token"
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+        }
+
+        data_dict = {
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+            "grant_type": "refresh_token",
+            "refresh_token": self.refresh_token
+        }
+
+        data = urllib.parse.urlencode(data_dict).encode("utf-8")
+        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+
+        def run_refresh():
+            try:
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    res_data = response.read().decode("utf-8")
+                    parsed = json.loads(res_data)
+                    new_access_token = parsed.get("access_token")
+                    new_refresh_token = parsed.get("refresh_token")
+
+                    if not new_access_token:
+                        logger.error("Token refresh response did not contain access_token.")
+                        if callback:
+                            callback(False)
+                        else:
+                            self.auto_authorize()
+                        return
+
+                    logger.info("Access token refreshed successfully via HTTP!")
+                    self.access_token = new_access_token
+                    if new_refresh_token:
+                        self.refresh_token = new_refresh_token
+
+                    # Notify main plugin to persist refreshed tokens
+                    if self.on_token_refreshed:
+                        try:
+                            self.on_token_refreshed(new_access_token, new_refresh_token)
+                        except Exception as e:
+                            logger.error(f"Error calling on_token_refreshed: {e}")
+
+                    # Authenticate connection with new token
+                    def on_auth_done(success):
+                        if not success:
+                            logger.warning("Refreshed access token failed IPC authentication. Falling back to auto-authorization...")
+                            self.auto_authorize()
+                        if callback:
+                            callback(success)
+
+                    self.authenticate(new_access_token, on_auth_done)
+
+            except urllib.error.HTTPError as e:
+                try:
+                    err_content = e.read().decode("utf-8")
+                except Exception:
+                    err_content = ""
+                logger.error(f"HTTP Error {e.code} during token refresh: {err_content or e.reason}")
+                logger.warning("Refresh token may be invalid/expired. Falling back to auto-authorization...")
+                self.refresh_token = None
+                self.auto_authorize()
+                if callback:
+                    callback(False)
+            except Exception as e:
+                logger.error(f"Error during token refresh: {e}")
+                self.auto_authorize()
+                if callback:
+                    callback(False)
+
+        threading.Thread(target=run_refresh, daemon=True).start()
 
     def auto_authorize(self):
         """Auto-authorize app silently in the background if already authorized, or prompt user if not"""
@@ -538,7 +630,7 @@ class DiscordIPCClient:
                 self._notify_connection_change()
                 return
                 
-            def token_callback(token):
+            def token_callback(token, refresh_token):
                 if not token:
                     logger.error("Auto-authorization token exchange failed.")
                     self._notify_connection_change()
@@ -546,11 +638,13 @@ class DiscordIPCClient:
                 
                 logger.info("Auto-authorization token received. Updating and authenticating...")
                 self.access_token = token
+                if refresh_token:
+                    self.refresh_token = refresh_token
                 
                 # Notify main plugin to save token in settings
                 if self.on_token_refreshed:
                     try:
-                        self.on_token_refreshed(token)
+                        self.on_token_refreshed(token, refresh_token)
                     except Exception as e:
                         logger.error(f"Error calling on_token_refreshed: {e}")
                         
