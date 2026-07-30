@@ -11,21 +11,21 @@ permissions:
 jobs:
   update-store:
     runs-on: ubuntu-latest
-    if: "github.event.head_commit != null && contains(github.event.head_commit.message, 'chore: bump version') == false && contains(github.event.head_commit.message, '[skip ci]') == false"
+    if: "github.event.head_commit != null && !contains(github.event.head_commit.message, 'chore: bump version') && !contains(github.event.head_commit.message, '[skip ci]')"
     steps:
       - name: Checkout Plugin Repository
         uses: actions/checkout@v4
         with:
+          ref: main
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Calculate and Update Version
         id: bump_version
         run: |
-          cat << 'EOF' > bump.py
-          import json
-          import re
+          python3 - << 'EOF'
+          import json, re
 
-          with open('manifest.json') as f:
+          with open('manifest.json', 'r') as f:
               data = json.load(f)
           version = data.get('version', '1.0.0')
 
@@ -35,11 +35,10 @@ jobs:
                   x, y, z = parts
                   if z < 10:
                       new_ver = f"{x}.{y}.{z+1}"
+                  elif y < 9:
+                      new_ver = f"{x}.{y+1}.0"
                   else:
-                      if y < 9:
-                          new_ver = f"{x}.{y+1}.0"
-                      else:
-                          new_ver = f"{x+1}.0.0"
+                      new_ver = f"{x+1}.0.0"
               else:
                   new_ver = "1.0.1"
           except Exception:
@@ -49,27 +48,27 @@ jobs:
               data['version'] = new_ver
               with open('manifest.json', 'w') as f:
                   json.dump(data, f, indent=4)
+                  f.write('\n')
                   
               with open('main.py', 'r') as f:
                   content = f.read()
               content = re.sub(r'plugin_version\s*=\s*["\'][^\'"]+["\']', f'plugin_version="{new_ver}"', content)
               with open('main.py', 'w') as f:
                   f.write(content)
-
-          print(new_ver)
           EOF
 
-          python3 -c "import textwrap; p = open('bump.py').read(); open('bump.py', 'w').write(textwrap.dedent(p))"
-          NEW_VERSION=$(python3 bump.py)
-          rm bump.py
-          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+          python3 -c "
+          import json
+          with open('manifest.json') as f:
+              print('NEW_VERSION=' + json.load(f).get('version', '1.0.0'))
+          " >> $GITHUB_ENV
 
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add manifest.json main.py
-          if ! git diff --quiet HEAD; then
-            git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
-            git push
+          if ! git diff --staged --quiet; then
+            git commit -m "chore: bump version to ${{ env.NEW_VERSION }} [skip ci]"
+            git push origin main
           fi
 
           echo "COMMIT_HASH=$(git rev-parse HEAD)" >> $GITHUB_ENV
@@ -78,16 +77,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: oparada1988/StreamController-Store
-          token: ${{ secrets.STORE_ACCESS_TOKEN }}
+          token: ${{ secrets.STORE_ACCESS_TOKEN || secrets.STORE_AUTOMATION_TOKEN || secrets.GITHUB_TOKEN }}
           path: store
+          ref: main
 
       - name: Update Plugins.json in Store
         run: |
           cd store
-
-          cat << 'EOF' > update_store.py
-          import json
-          import os
+          python3 - << 'EOF'
+          import json, os
 
           new_version = os.environ.get('NEW_VERSION')
           commit_hash = os.environ.get('COMMIT_HASH')
@@ -98,7 +96,7 @@ jobs:
           found = False
           for plugin in data:
               if 'DiscordSC' in plugin.get('url', ''):
-                  if 'commits' not in plugin:
+                  if 'commits' not in plugin or not isinstance(plugin['commits'], dict):
                       plugin['commits'] = {}
                   plugin['commits'][new_version] = commit_hash
                   found = True
@@ -114,11 +112,8 @@ jobs:
 
           with open('Plugins.json', 'w') as f:
               json.dump(data, f, indent=2)
+              f.write('\n')
           EOF
-
-          python3 -c "import textwrap; p = open('update_store.py').read(); open('update_store.py', 'w').write(textwrap.dedent(p))"
-          python3 update_store.py
-          rm update_store.py
 
       - name: Commit and Push Changes to Store
         run: |
@@ -126,5 +121,7 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Plugins.json
-          git commit -m "Auto-update DiscordSC to version ${{ env.NEW_VERSION }} (commit ${{ env.COMMIT_HASH }})" || exit 0
-          git push
+          if ! git diff --staged --quiet; then
+            git commit -m "Auto-update DiscordSC to version ${{ env.NEW_VERSION }} (commit ${{ env.COMMIT_HASH }})"
+            git push origin main
+          fi
