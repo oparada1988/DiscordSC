@@ -73,15 +73,27 @@ jobs:
 
           echo "COMMIT_HASH=$(git rev-parse HEAD)" >> $GITHUB_ENV
 
+      - name: Check for Store Token Secret
+        id: check_secret
+        run: |
+          if [ -n "${{ secrets.STORE_ACCESS_TOKEN }}" ] || [ -n "${{ secrets.STORE_AUTOMATION_TOKEN }}" ]; then
+            echo "HAS_SECRET=true" >> $GITHUB_ENV
+          else
+            echo "HAS_SECRET=false" >> $GITHUB_ENV
+            echo "::warning::STORE_ACCESS_TOKEN or STORE_AUTOMATION_TOKEN secret is not set in GitHub repository settings. Store repository update skipped."
+          fi
+
       - name: Checkout Store Repository
+        if: env.HAS_SECRET == 'true'
         uses: actions/checkout@v4
         with:
           repository: oparada1988/StreamController-Store
-          token: ${{ secrets.STORE_ACCESS_TOKEN || secrets.STORE_AUTOMATION_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.STORE_ACCESS_TOKEN || secrets.STORE_AUTOMATION_TOKEN }}
           path: store
           ref: main
 
       - name: Update Plugins.json in Store
+        if: env.HAS_SECRET == 'true'
         run: |
           cd store
           python3 - << 'EOF'
@@ -116,6 +128,7 @@ jobs:
           EOF
 
       - name: Commit and Push Changes to Store
+        if: env.HAS_SECRET == 'true'
         run: |
           cd store
           git config --global user.name "github-actions[bot]"
