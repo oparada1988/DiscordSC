@@ -1,5 +1,5 @@
 {
-    "version": "1.0.2",
+    "version": "1.0.3",
     "author": "oparada1988",
     "thumbnail": "assets/thumbnail.png",
     "id": "com_oparada_DiscordSC",
@@ -10,7 +10,10 @@
     "short-descriptions": {
         "en_US": "Discord Integration for StreamController"
     },
-    "tags": ["Utility", "Communication"],
+    "tags": [
+        "Utility",
+        "Communication"
+    ],
     "minimum-version": "1.0.0",
     "app-version": "1.1.1-alpha",
     "description": "Control your Discord client's mute, deafen, and voice state directly from your StreamController deck.",
