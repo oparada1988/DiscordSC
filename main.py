@@ -124,7 +124,7 @@ class PluginTemplate(PluginBase):
         self.register(
             plugin_name="DiscordSC",
             github_repo="https://github.com/oparada1988/DiscordSC",
-            plugin_version="1.0.5",
+            plugin_version="1.0.6",
             app_version="1.1.1-alpha"
         )
 
