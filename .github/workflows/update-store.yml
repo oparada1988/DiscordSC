@@ -1,0 +1,130 @@
+name: Update Store Manifest
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  update-store:
+    runs-on: ubuntu-latest
+    if: "github.event.head_commit != null && contains(github.event.head_commit.message, 'chore: bump version') == false && contains(github.event.head_commit.message, '[skip ci]') == false"
+    steps:
+      - name: Checkout Plugin Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Calculate and Update Version
+        id: bump_version
+        run: |
+          cat << 'EOF' > bump.py
+          import json
+          import re
+
+          with open('manifest.json') as f:
+              data = json.load(f)
+          version = data.get('version', '1.0.0')
+
+          try:
+              parts = [int(p) for p in version.split('.')]
+              if len(parts) == 3:
+                  x, y, z = parts
+                  if z < 10:
+                      new_ver = f"{x}.{y}.{z+1}"
+                  else:
+                      if y < 9:
+                          new_ver = f"{x}.{y+1}.0"
+                      else:
+                          new_ver = f"{x+1}.0.0"
+              else:
+                  new_ver = "1.0.1"
+          except Exception:
+              new_ver = "1.0.1"
+
+          if version != new_ver:
+              data['version'] = new_ver
+              with open('manifest.json', 'w') as f:
+                  json.dump(data, f, indent=4)
+                  
+              with open('main.py', 'r') as f:
+                  content = f.read()
+              content = re.sub(r'plugin_version\s*=\s*["\'][^\'"]+["\']', f'plugin_version="{new_ver}"', content)
+              with open('main.py', 'w') as f:
+                  f.write(content)
+
+          print(new_ver)
+          EOF
+
+          python3 -c "import textwrap; p = open('bump.py').read(); open('bump.py', 'w').write(textwrap.dedent(p))"
+          NEW_VERSION=$(python3 bump.py)
+          rm bump.py
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manifest.json main.py
+          if ! git diff --quiet HEAD; then
+            git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
+            git push
+          fi
+
+          echo "COMMIT_HASH=$(git rev-parse HEAD)" >> $GITHUB_ENV
+
+      - name: Checkout Store Repository
+        uses: actions/checkout@v4
+        with:
+          repository: oparada1988/StreamController-Store
+          token: ${{ secrets.STORE_ACCESS_TOKEN }}
+          path: store
+
+      - name: Update Plugins.json in Store
+        run: |
+          cd store
+
+          cat << 'EOF' > update_store.py
+          import json
+          import os
+
+          new_version = os.environ.get('NEW_VERSION')
+          commit_hash = os.environ.get('COMMIT_HASH')
+
+          with open('Plugins.json', 'r') as f:
+              data = json.load(f)
+
+          found = False
+          for plugin in data:
+              if 'DiscordSC' in plugin.get('url', ''):
+                  if 'commits' not in plugin:
+                      plugin['commits'] = {}
+                  plugin['commits'][new_version] = commit_hash
+                  found = True
+                  break
+
+          if not found:
+              data.append({
+                  "url": "https://github.com/oparada1988/DiscordSC",
+                  "commits": {
+                      new_version: commit_hash
+                  }
+              })
+
+          with open('Plugins.json', 'w') as f:
+              json.dump(data, f, indent=2)
+          EOF
+
+          python3 -c "import textwrap; p = open('update_store.py').read(); open('update_store.py', 'w').write(textwrap.dedent(p))"
+          python3 update_store.py
+          rm update_store.py
+
+      - name: Commit and Push Changes to Store
+        run: |
+          cd store
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Plugins.json
+          git commit -m "Auto-update DiscordSC to version ${{ env.NEW_VERSION }} (commit ${{ env.COMMIT_HASH }})" || exit 0
+          git push
