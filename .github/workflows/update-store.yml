@@ -105,9 +105,7 @@ jobs:
           found = False
           for plugin in data:
               if 'DiscordSC' in plugin.get('url', ''):
-                  if 'commits' not in plugin or not isinstance(plugin['commits'], dict):
-                      plugin['commits'] = {}
-                  plugin['commits'][new_version] = commit_hash
+                  plugin['commits'] = {new_version: commit_hash}
                   found = True
                   break
 
