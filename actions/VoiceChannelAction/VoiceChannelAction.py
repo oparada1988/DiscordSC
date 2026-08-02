@@ -8,6 +8,7 @@ from src.backend.PluginManager.PluginBase import PluginBase
 import os
 from loguru import logger
 import threading
+from typing import Optional
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
