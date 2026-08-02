@@ -18,6 +18,7 @@ class TextChannelAction(ActionBase):
         super().__init__(*args, **kwargs)
         self.guilds_map = []
         self.channels_map = []
+        self.cached_channels_guild_id = None
         self._loading_guilds = False
         self._loading_channels = False
 
