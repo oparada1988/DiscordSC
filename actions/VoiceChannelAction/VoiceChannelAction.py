@@ -24,6 +24,76 @@ class VoiceChannelAction(ActionBase):
         self._loading_channels = False
         self.current_channel_id = None
 
+    def update_labels(self):
+        def _update():
+            settings = self.get_settings() or {}
+            guild_id = settings.get("guild_id", "")
+            channel_id = settings.get("channel_id", "")
+
+            def apply_labels():
+                s = self.get_settings() or {}
+                g_id = s.get("guild_id", "")
+                c_id = s.get("channel_id", "")
+
+                server_name = s.get("guild_name", "")
+                for id_, name in self.guilds_map:
+                    if id_ == g_id:
+                        server_name = name
+                        break
+
+                channel_name = s.get("channel_name", "")
+                for id_, name in self.channels_map:
+                    if id_ == c_id:
+                        channel_name = name
+                        break
+
+                if (server_name and server_name != s.get("guild_name")) or (channel_name and channel_name != s.get("channel_name")):
+                    if server_name:
+                        s["guild_name"] = server_name
+                    if channel_name:
+                        s["channel_name"] = channel_name
+                    self.set_settings(s)
+
+                self.set_top_label(server_name)
+                self.set_bottom_label(channel_name)
+
+            if not self.plugin_base.discord_client.connected or not self.plugin_base.discord_client.authenticated:
+                apply_labels()
+                return
+
+            if not guild_id:
+                apply_labels()
+                return
+
+            def fetch_channels_and_apply():
+                if not self.channels_map or getattr(self, "cached_channels_guild_id", None) != guild_id:
+                    def on_channels(payload: dict):
+                        data = payload.get("data", {})
+                        channels = data.get("channels", [])
+                        filtered = [c for c in channels if c.get("type") in [2, 13]]
+                        filtered_sorted = sorted(filtered, key=lambda c: c.get("name", "").lower())
+                        self.channels_map = [(c.get("id"), c.get("name")) for c in filtered_sorted]
+                        self.cached_channels_guild_id = guild_id
+                        GLib.idle_add(apply_labels)
+
+                    self.plugin_base.discord_client.get_channels(guild_id, on_channels)
+                else:
+                    GLib.idle_add(apply_labels)
+
+            if not self.guilds_map:
+                def on_guilds(payload: dict):
+                    data = payload.get("data", {})
+                    guilds = data.get("guilds", [])
+                    guilds_sorted = sorted(guilds, key=lambda g: g.get("name", "").lower())
+                    self.guilds_map = [(g.get("id"), g.get("name")) for g in guilds_sorted]
+                    fetch_channels_and_apply()
+
+                self.plugin_base.discord_client.get_guilds(on_guilds)
+            else:
+                fetch_channels_and_apply()
+
+        GLib.idle_add(_update)
+
     def on_ready(self) -> None:
         # Ensure we have image control so our icon is displayed by default
         try:
@@ -57,6 +127,8 @@ class VoiceChannelAction(ActionBase):
             client.get_selected_voice_channel(self.on_get_selected_voice_channel)
             client.subscribe("VOICE_CHANNEL_SELECT")
         
+        self.update_labels()
+
         # If settings dropdowns exist, refresh their state
         if hasattr(self, "guild_selector") and self.guild_selector is not None:
             GLib.idle_add(self.load_guilds)
@@ -372,6 +444,7 @@ class VoiceChannelAction(ActionBase):
             guild_id, guild_name = self.guilds_map[selected_index]
             settings = self.get_settings() or {}
             settings["guild_id"] = guild_id
+            settings["guild_name"] = guild_name
             self.set_settings(settings)
             
             # Clear old channels cache when changing guild
@@ -380,6 +453,7 @@ class VoiceChannelAction(ActionBase):
             
             # Load channels for the newly selected guild
             self.load_channels(guild_id)
+            self.update_labels()
 
     def on_channel_changed(self, combo, *args):
         if getattr(self, "_loading_channels", False):
@@ -389,5 +463,9 @@ class VoiceChannelAction(ActionBase):
             channel_id, channel_name = self.channels_map[selected_index]
             settings = self.get_settings() or {}
             settings["channel_id"] = channel_id
+            settings["channel_name"] = channel_name
             self.set_settings(settings)
             self.update_channel_state(self.current_channel_id)
+            self.update_labels()
+
+
