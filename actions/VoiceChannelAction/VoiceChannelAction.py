@@ -98,10 +98,13 @@ class VoiceChannelAction(ActionBase):
             logger.warning("VoiceChannelAction: No Channel ID configured.")
             return
 
-        # Toggle: Leave if already in this channel and toggle is enabled, otherwise Join
-        if self.current_channel_id == channel_id and disconnect_on_press:
-            logger.info(f"VoiceChannelAction: Leaving voice channel {channel_id}")
-            client.select_voice_channel(channel_id=None)
+        # Check channel state and toggle setting:
+        if self.current_channel_id == channel_id:
+            if disconnect_on_press:
+                logger.info(f"VoiceChannelAction: Leaving voice channel {channel_id}")
+                client.select_voice_channel(channel_id=None)
+            else:
+                logger.info(f"VoiceChannelAction: Already in voice channel {channel_id} and 'Leave Voice on Press' is disabled. Remaining in channel.")
         else:
             logger.info(f"VoiceChannelAction: Joining voice channel {channel_id}")
             client.select_voice_channel(channel_id=channel_id)
