@@ -96,8 +96,6 @@ class TextChannelAction(ActionBase):
             self.channel_selector = None
             self.guild_model = None
             self.channel_model = None
-            self.guilds_map = []
-            self.channels_map = []
 
         self.guild_selector.connect("destroy", on_destroy)
 
@@ -105,6 +103,9 @@ class TextChannelAction(ActionBase):
 
     def load_guilds(self):
         client = self.plugin_base.discord_client
+        if not hasattr(self, "guild_selector") or self.guild_selector is None:
+            return
+
         if not client.connected or not client.authenticated:
             self.guilds_map = []
             self.guild_model = Gtk.StringList()
@@ -115,13 +116,15 @@ class TextChannelAction(ActionBase):
             self.channels_map = []
             self.channel_model = Gtk.StringList()
             self.channel_model.append("Discord disconnected / unauthorized")
-            self.channel_selector.set_model(self.channel_model)
-            self.channel_selector.set_sensitive(False)
+            if hasattr(self, "channel_selector") and self.channel_selector is not None:
+                self.channel_selector.set_model(self.channel_model)
+                self.channel_selector.set_sensitive(False)
             return
 
         self._loading_guilds = True
         self.guild_selector.set_sensitive(False)
-        self.channel_selector.set_sensitive(False)
+        if hasattr(self, "channel_selector") and self.channel_selector is not None:
+            self.channel_selector.set_sensitive(False)
         
         self.guild_model = Gtk.StringList()
         self.guild_model.append("Loading servers...")
@@ -129,6 +132,8 @@ class TextChannelAction(ActionBase):
 
         def on_guilds_received(payload: dict):
             def update_ui():
+                if not hasattr(self, "guild_selector") or self.guild_selector is None:
+                    return
                 self._loading_guilds = True
                 try:
                     data = payload.get("data", {})
@@ -170,6 +175,9 @@ class TextChannelAction(ActionBase):
 
     def load_channels(self, guild_id: str):
         client = self.plugin_base.discord_client
+        if not hasattr(self, "channel_selector") or self.channel_selector is None:
+            return
+
         if not client.connected or not client.authenticated:
             return
 
@@ -182,6 +190,8 @@ class TextChannelAction(ActionBase):
 
         def on_channels_received(payload: dict):
             def update_ui():
+                if not hasattr(self, "channel_selector") or self.channel_selector is None:
+                    return
                 self._loading_channels = True
                 try:
                     data = payload.get("data", {})
