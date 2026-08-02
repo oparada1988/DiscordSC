@@ -73,10 +73,9 @@ class VoiceChannelAction(ActionBase):
         self.current_channel_id = current_channel_id
         settings = self.get_settings() or {}
         target_channel_id = settings.get("channel_id", "").strip()
+        disconnect_on_press = settings.get("disconnect_on_press", True)
 
-        if target_channel_id in ["", "0"]:
-            media_name = "voice_channel.png"
-        elif current_channel_id and current_channel_id == target_channel_id:
+        if current_channel_id and current_channel_id == target_channel_id and disconnect_on_press:
             media_name = "voice_channel_active.png"
         else:
             media_name = "voice_channel.png"
@@ -93,15 +92,14 @@ class VoiceChannelAction(ActionBase):
             
         settings = self.get_settings() or {}
         channel_id = settings.get("channel_id", "").strip()
+        disconnect_on_press = settings.get("disconnect_on_press", True)
 
-        # Explicit Disconnect button or unconfigured
-        if channel_id in ["", "0"]:
-            logger.info("VoiceChannelAction: Disconnecting from voice channel.")
-            client.select_voice_channel(channel_id=None)
+        if not channel_id:
+            logger.warning("VoiceChannelAction: No Channel ID configured.")
             return
 
-        # Toggle: Leave if already in this channel, otherwise Join
-        if self.current_channel_id == channel_id:
+        # Toggle: Leave if already in this channel and toggle is enabled, otherwise Join
+        if self.current_channel_id == channel_id and disconnect_on_press:
             logger.info(f"VoiceChannelAction: Leaving voice channel {channel_id}")
             client.select_voice_channel(channel_id=None)
         else:
@@ -126,6 +124,15 @@ class VoiceChannelAction(ActionBase):
         )
         self.channel_selector.connect("notify::selected-item", self.on_channel_changed)
 
+        settings = self.get_settings() or {}
+
+        self.disconnect_switch = Adw.SwitchRow(
+            title="Leave Voice on Press",
+            subtitle="Disconnect from channel when pressed while active"
+        )
+        self.disconnect_switch.set_active(settings.get("disconnect_on_press", True))
+        self.disconnect_switch.connect("notify::active", self.on_disconnect_switch_changed)
+
         # Trigger initial loading of servers
         self.load_guilds()
 
@@ -133,6 +140,7 @@ class VoiceChannelAction(ActionBase):
         def on_destroy(widget):
             self.guild_selector = None
             self.channel_selector = None
+            self.disconnect_switch = None
             self.guild_model = None
             self.channel_model = None
             self.guilds_map = []
@@ -140,7 +148,13 @@ class VoiceChannelAction(ActionBase):
 
         self.guild_selector.connect("destroy", on_destroy)
 
-        return [self.guild_selector, self.channel_selector]
+        return [self.guild_selector, self.channel_selector, self.disconnect_switch]
+
+    def on_disconnect_switch_changed(self, switch, *args):
+        settings = self.get_settings() or {}
+        settings["disconnect_on_press"] = switch.get_active()
+        self.set_settings(settings)
+        self.update_channel_state(self.current_channel_id)
 
     def load_guilds(self):
         client = self.plugin_base.discord_client
@@ -229,9 +243,7 @@ class VoiceChannelAction(ActionBase):
                     # Filter for voice channels (type 2) and stage channels (type 13)
                     filtered = [c for c in channels if c.get("type") in [2, 13]]
                     filtered_sorted = sorted(filtered, key=lambda c: c.get("name", "").lower())
-
-                    # Prepend Disconnect / Leave Voice option (ID "0")
-                    self.channels_map = [("0", "Disconnect / Leave Voice")] + [(c.get("id"), c.get("name")) for c in filtered_sorted]
+                    self.channels_map = [(c.get("id"), c.get("name")) for c in filtered_sorted]
                     
                     self.channel_model = Gtk.StringList()
                     if not self.channels_map:
