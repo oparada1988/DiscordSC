@@ -192,7 +192,7 @@ class DiscordIPCClient:
         if not os.path.exists('/.flatpak-info'):
             return False
             
-        logger.info("Attempting to connect via Flatpak host bridge...")
+        logger.debug("Attempting to connect via Flatpak host bridge...")
         bridge_code = (
             "import os, socket, sys, threading\n"
             "env_path = os.environ.get('DISCORD_IPC_PATH')\n"
@@ -263,7 +263,7 @@ class DiscordIPCClient:
                 exit_code = proc.returncode
                 err_msg = proc.stderr.read().decode("utf-8", errors="replace")
                 out_msg = proc.stdout.read().decode("utf-8", errors="replace")
-                logger.warning(f"Flatpak host bridge process exited immediately with code {exit_code}. Stderr: {err_msg.strip()}. Stdout: {out_msg.strip()}")
+                logger.debug(f"Flatpak host bridge process exited immediately with code {exit_code}. Stderr: {err_msg.strip()}. Stdout: {out_msg.strip()}")
                 return False
                 
             self.sock = SubprocessSocketWrapper(proc)
