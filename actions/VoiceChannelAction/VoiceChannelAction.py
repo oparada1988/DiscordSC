@@ -199,7 +199,11 @@ class VoiceChannelAction(ActionBase):
 
                 self.guild_selector.set_selected(selected_index)
                 if 0 <= selected_index < len(self.guilds_map):
-                    self.load_channels(self.guilds_map[selected_index][0])
+                    g_id = self.guilds_map[selected_index][0]
+                    if settings.get("guild_id") != g_id:
+                        settings["guild_id"] = g_id
+                        self.set_settings(settings)
+                    self.load_channels(g_id)
             finally:
                 self._loading_guilds = False
         else:
@@ -247,7 +251,11 @@ class VoiceChannelAction(ActionBase):
 
                     self.guild_selector.set_selected(selected_index)
                     if 0 <= selected_index < len(self.guilds_map):
-                        self.load_channels(self.guilds_map[selected_index][0])
+                        g_id = self.guilds_map[selected_index][0]
+                        if settings.get("guild_id") != g_id:
+                            settings["guild_id"] = g_id
+                            self.set_settings(settings)
+                        self.load_channels(g_id)
                 finally:
                     self._loading_guilds = False
 
@@ -283,6 +291,15 @@ class VoiceChannelAction(ActionBase):
                             break
 
                 self.channel_selector.set_selected(selected_index)
+
+                # Ensure initial channel_id is explicitly saved to settings if missing
+                if 0 <= selected_index < len(self.channels_map):
+                    c_id = self.channels_map[selected_index][0]
+                    if settings.get("channel_id") != c_id or settings.get("guild_id") != guild_id:
+                        settings["guild_id"] = guild_id
+                        settings["channel_id"] = c_id
+                        self.set_settings(settings)
+                        self.update_channel_state(self.current_channel_id)
             finally:
                 self._loading_channels = False
         else:
@@ -331,6 +348,15 @@ class VoiceChannelAction(ActionBase):
                                 break
 
                     self.channel_selector.set_selected(selected_index)
+
+                    # Ensure initial channel_id is explicitly saved to settings if missing
+                    if 0 <= selected_index < len(self.channels_map):
+                        c_id = self.channels_map[selected_index][0]
+                        if settings.get("channel_id") != c_id or settings.get("guild_id") != guild_id:
+                            settings["guild_id"] = guild_id
+                            settings["channel_id"] = c_id
+                            self.set_settings(settings)
+                            self.update_channel_state(self.current_channel_id)
                 finally:
                     self._loading_channels = False
 
