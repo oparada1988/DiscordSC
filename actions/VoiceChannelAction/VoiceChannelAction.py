@@ -35,17 +35,21 @@ class VoiceChannelAction(ActionBase):
                 g_id = s.get("guild_id", "")
                 c_id = s.get("channel_id", "")
 
-                server_name = s.get("guild_name", "")
-                for id_, name in self.guilds_map:
-                    if id_ == g_id:
-                        server_name = name
-                        break
+                server_name = ""
+                if g_id:
+                    server_name = s.get("guild_name", "")
+                    for id_, name in self.guilds_map:
+                        if id_ == g_id:
+                            server_name = name
+                            break
 
-                channel_name = s.get("channel_name", "")
-                for id_, name in self.channels_map:
-                    if id_ == c_id:
-                        channel_name = name
-                        break
+                channel_name = ""
+                if c_id:
+                    channel_name = s.get("channel_name", "")
+                    for id_, name in self.channels_map:
+                        if id_ == c_id:
+                            channel_name = name
+                            break
 
                 if (server_name and server_name != s.get("guild_name")) or (channel_name and channel_name != s.get("channel_name")):
                     if server_name:
@@ -72,7 +76,7 @@ class VoiceChannelAction(ActionBase):
                         channels = data.get("channels", [])
                         filtered = [c for c in channels if c.get("type") in [2, 13]]
                         filtered_sorted = sorted(filtered, key=lambda c: c.get("name", "").lower())
-                        self.channels_map = [(c.get("id"), c.get("name")) for c in filtered_sorted]
+                        self.channels_map = [("", "Select a Channel...")] + [(c.get("id"), c.get("name")) for c in filtered_sorted]
                         self.cached_channels_guild_id = guild_id
                         GLib.idle_add(apply_labels)
 
@@ -85,7 +89,7 @@ class VoiceChannelAction(ActionBase):
                     data = payload.get("data", {})
                     guilds = data.get("guilds", [])
                     guilds_sorted = sorted(guilds, key=lambda g: g.get("name", "").lower())
-                    self.guilds_map = [(g.get("id"), g.get("name")) for g in guilds_sorted]
+                    self.guilds_map = [("", "Select a Server...")] + [(g.get("id"), g.get("name")) for g in guilds_sorted]
                     fetch_channels_and_apply()
 
                 self.plugin_base.discord_client.get_guilds(on_guilds)
@@ -148,7 +152,7 @@ class VoiceChannelAction(ActionBase):
         target_channel_id = settings.get("channel_id", "").strip()
         disconnect_on_press = settings.get("disconnect_on_press", True)
 
-        if current_channel_id and current_channel_id == target_channel_id and disconnect_on_press:
+        if current_channel_id and target_channel_id and current_channel_id == target_channel_id and disconnect_on_press:
             media_name = "voice_channel_active.png"
         else:
             media_name = "voice_channel.png"
@@ -270,12 +274,11 @@ class VoiceChannelAction(ActionBase):
                             break
 
                 self.guild_selector.set_selected(selected_index)
-                if 0 <= selected_index < len(self.guilds_map):
+                if 0 < selected_index < len(self.guilds_map):
                     g_id = self.guilds_map[selected_index][0]
-                    if settings.get("guild_id") != g_id:
-                        settings["guild_id"] = g_id
-                        self.set_settings(settings)
                     self.load_channels(g_id)
+                else:
+                    self.load_channels("")
             finally:
                 self._loading_guilds = False
         else:
@@ -297,15 +300,9 @@ class VoiceChannelAction(ActionBase):
                     data = payload.get("data", {})
                     guilds = data.get("guilds", [])
                     guilds_sorted = sorted(guilds, key=lambda g: g.get("name", "").lower())
-                    self.guilds_map = [(g.get("id"), g.get("name")) for g in guilds_sorted]
+                    self.guilds_map = [("", "Select a Server...")] + [(g.get("id"), g.get("name")) for g in guilds_sorted]
                     
                     self.guild_model = Gtk.StringList()
-                    if not self.guilds_map:
-                        self.guild_model.append("No servers found")
-                        self.guild_selector.set_model(self.guild_model)
-                        self.guild_selector.set_sensitive(False)
-                        return
-
                     for _, name in self.guilds_map:
                         self.guild_model.append(name)
                     self.guild_selector.set_model(self.guild_model)
@@ -322,12 +319,11 @@ class VoiceChannelAction(ActionBase):
                                 break
 
                     self.guild_selector.set_selected(selected_index)
-                    if 0 <= selected_index < len(self.guilds_map):
+                    if 0 < selected_index < len(self.guilds_map):
                         g_id = self.guilds_map[selected_index][0]
-                        if settings.get("guild_id") != g_id:
-                            settings["guild_id"] = g_id
-                            self.set_settings(settings)
                         self.load_channels(g_id)
+                    else:
+                        self.load_channels("")
                 finally:
                     self._loading_guilds = False
 
@@ -338,6 +334,15 @@ class VoiceChannelAction(ActionBase):
     def load_channels(self, guild_id: str):
         client = self.plugin_base.discord_client
         if not hasattr(self, "channel_selector") or self.channel_selector is None:
+            return
+
+        if not guild_id:
+            self.channels_map = [("", "Select a Channel...")]
+            self.channel_model = Gtk.StringList()
+            self.channel_model.append("Select a Channel...")
+            self.channel_selector.set_model(self.channel_model)
+            self.channel_selector.set_selected(0)
+            self.channel_selector.set_sensitive(False)
             return
 
         if not client.connected or not client.authenticated:
@@ -363,15 +368,6 @@ class VoiceChannelAction(ActionBase):
                             break
 
                 self.channel_selector.set_selected(selected_index)
-
-                # Ensure initial channel_id is explicitly saved to settings if missing
-                if 0 <= selected_index < len(self.channels_map):
-                    c_id = self.channels_map[selected_index][0]
-                    if settings.get("channel_id") != c_id or settings.get("guild_id") != guild_id:
-                        settings["guild_id"] = guild_id
-                        settings["channel_id"] = c_id
-                        self.set_settings(settings)
-                        self.update_channel_state(self.current_channel_id)
             finally:
                 self._loading_channels = False
         else:
@@ -394,16 +390,10 @@ class VoiceChannelAction(ActionBase):
                     # Filter for voice channels (type 2) and stage channels (type 13)
                     filtered = [c for c in channels if c.get("type") in [2, 13]]
                     filtered_sorted = sorted(filtered, key=lambda c: c.get("name", "").lower())
-                    self.channels_map = [(c.get("id"), c.get("name")) for c in filtered_sorted]
+                    self.channels_map = [("", "Select a Channel...")] + [(c.get("id"), c.get("name")) for c in filtered_sorted]
                     self.cached_channels_guild_id = guild_id
                     
                     self.channel_model = Gtk.StringList()
-                    if not self.channels_map:
-                        self.channel_model.append("No voice channels found")
-                        self.channel_selector.set_model(self.channel_model)
-                        self.channel_selector.set_sensitive(False)
-                        return
-
                     for _, name in self.channels_map:
                         self.channel_model.append(name)
                     self.channel_selector.set_model(self.channel_model)
@@ -420,15 +410,6 @@ class VoiceChannelAction(ActionBase):
                                 break
 
                     self.channel_selector.set_selected(selected_index)
-
-                    # Ensure initial channel_id is explicitly saved to settings if missing
-                    if 0 <= selected_index < len(self.channels_map):
-                        c_id = self.channels_map[selected_index][0]
-                        if settings.get("channel_id") != c_id or settings.get("guild_id") != guild_id:
-                            settings["guild_id"] = guild_id
-                            settings["channel_id"] = c_id
-                            self.set_settings(settings)
-                            self.update_channel_state(self.current_channel_id)
                 finally:
                     self._loading_channels = False
 
@@ -443,16 +424,24 @@ class VoiceChannelAction(ActionBase):
         if 0 <= selected_index < len(self.guilds_map):
             guild_id, guild_name = self.guilds_map[selected_index]
             settings = self.get_settings() or {}
-            settings["guild_id"] = guild_id
-            settings["guild_name"] = guild_name
-            self.set_settings(settings)
-            
-            # Clear old channels cache when changing guild
-            self.channels_map = []
-            self.cached_channels_guild_id = None
-            
-            # Load channels for the newly selected guild
-            self.load_channels(guild_id)
+            if not guild_id:
+                settings["guild_id"] = ""
+                settings["guild_name"] = ""
+                settings["channel_id"] = ""
+                settings["channel_name"] = ""
+                self.set_settings(settings)
+                self.channels_map = [("", "Select a Channel...")]
+                self.cached_channels_guild_id = None
+                self.load_channels("")
+            else:
+                settings["guild_id"] = guild_id
+                settings["guild_name"] = guild_name
+                settings["channel_id"] = ""
+                settings["channel_name"] = ""
+                self.set_settings(settings)
+                self.channels_map = []
+                self.cached_channels_guild_id = None
+                self.load_channels(guild_id)
             self.update_labels()
 
     def on_channel_changed(self, combo, *args):
@@ -462,10 +451,12 @@ class VoiceChannelAction(ActionBase):
         if 0 <= selected_index < len(self.channels_map):
             channel_id, channel_name = self.channels_map[selected_index]
             settings = self.get_settings() or {}
-            settings["channel_id"] = channel_id
-            settings["channel_name"] = channel_name
+            if not channel_id:
+                settings["channel_id"] = ""
+                settings["channel_name"] = ""
+            else:
+                settings["channel_id"] = channel_id
+                settings["channel_name"] = channel_name
             self.set_settings(settings)
             self.update_channel_state(self.current_channel_id)
             self.update_labels()
-
-
