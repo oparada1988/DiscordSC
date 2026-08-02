@@ -121,14 +121,39 @@ class TextChannelAction(ActionBase):
                 self.channel_selector.set_sensitive(False)
             return
 
-        self._loading_guilds = True
-        self.guild_selector.set_sensitive(False)
-        if hasattr(self, "channel_selector") and self.channel_selector is not None:
-            self.channel_selector.set_sensitive(False)
-        
-        self.guild_model = Gtk.StringList()
-        self.guild_model.append("Loading servers...")
-        self.guild_selector.set_model(self.guild_model)
+        # Render cached servers instantly if present
+        if self.guilds_map:
+            self._loading_guilds = True
+            try:
+                self.guild_model = Gtk.StringList()
+                for _, name in self.guilds_map:
+                    self.guild_model.append(name)
+                self.guild_selector.set_model(self.guild_model)
+                self.guild_selector.set_sensitive(True)
+
+                settings = self.get_settings() or {}
+                saved_guild_id = settings.get("guild_id", "")
+                selected_index = 0
+                if saved_guild_id:
+                    for idx, (g_id, _) in enumerate(self.guilds_map):
+                        if g_id == saved_guild_id:
+                            selected_index = idx
+                            break
+
+                self.guild_selector.set_selected(selected_index)
+                if 0 <= selected_index < len(self.guilds_map):
+                    self.load_channels(self.guilds_map[selected_index][0])
+            finally:
+                self._loading_guilds = False
+        else:
+            self._loading_guilds = True
+            self.guild_selector.set_sensitive(False)
+            if hasattr(self, "channel_selector") and self.channel_selector is not None:
+                self.channel_selector.set_sensitive(False)
+            
+            self.guild_model = Gtk.StringList()
+            self.guild_model.append("Loading servers...")
+            self.guild_selector.set_model(self.guild_model)
 
         def on_guilds_received(payload: dict):
             def update_ui():
@@ -181,12 +206,35 @@ class TextChannelAction(ActionBase):
         if not client.connected or not client.authenticated:
             return
 
-        self._loading_channels = True
-        self.channel_selector.set_sensitive(False)
-        
-        self.channel_model = Gtk.StringList()
-        self.channel_model.append("Loading channels...")
-        self.channel_selector.set_model(self.channel_model)
+        # Render cached channels instantly if present
+        if self.channels_map:
+            self._loading_channels = True
+            try:
+                self.channel_model = Gtk.StringList()
+                for _, name in self.channels_map:
+                    self.channel_model.append(name)
+                self.channel_selector.set_model(self.channel_model)
+                self.channel_selector.set_sensitive(True)
+
+                settings = self.get_settings() or {}
+                saved_channel_id = settings.get("channel_id", "")
+                selected_index = 0
+                if saved_channel_id:
+                    for idx, (c_id, _) in enumerate(self.channels_map):
+                        if c_id == saved_channel_id:
+                            selected_index = idx
+                            break
+
+                self.channel_selector.set_selected(selected_index)
+            finally:
+                self._loading_channels = False
+        else:
+            self._loading_channels = True
+            self.channel_selector.set_sensitive(False)
+            
+            self.channel_model = Gtk.StringList()
+            self.channel_model.append("Loading channels...")
+            self.channel_selector.set_model(self.channel_model)
 
         def on_channels_received(payload: dict):
             def update_ui():
