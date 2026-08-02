@@ -6,6 +6,7 @@ from src.backend.DeckManagement.InputIdentifier import Input
 
 # Import python & gtk modules
 import os
+import json
 import gi
 from loguru import logger
 import threading
@@ -120,11 +121,22 @@ class PluginTemplate(PluginBase):
         )
         self.add_action_holder(self.push_to_talk_action_holder)
 
+        # Load manifest version dynamically
+        plugin_ver = "1.0.0"
+        try:
+            manifest_path = os.path.join(self.PATH, "manifest.json")
+            if os.path.exists(manifest_path):
+                with open(manifest_path, "r", encoding="utf-8") as f:
+                    manifest = json.load(f)
+                    plugin_ver = manifest.get("version", plugin_ver)
+        except Exception as e:
+            logger.error(f"Error loading manifest version: {e}")
+
         # Register plugin
         self.register(
             plugin_name="DiscordSC",
             github_repo="https://github.com/oparada1988/DiscordSC",
-            plugin_version="1.1.0",
+            plugin_version=plugin_ver,
             app_version="1.1.1-alpha"
         )
 

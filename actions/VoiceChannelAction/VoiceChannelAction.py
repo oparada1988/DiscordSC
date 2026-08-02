@@ -57,7 +57,7 @@ class VoiceChannelAction(ActionBase):
             client.subscribe("VOICE_CHANNEL_SELECT")
         
         # If settings dropdowns exist, refresh their state
-        if hasattr(self, "guild_selector"):
+        if hasattr(self, "guild_selector") and self.guild_selector is not None:
             GLib.idle_add(self.load_guilds)
 
     def on_voice_channel_select(self, data: dict):

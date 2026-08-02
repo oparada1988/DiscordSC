@@ -52,7 +52,7 @@ class TextChannelAction(ActionBase):
                 GLib.idle_add(lambda: self.set_media(media_path=media_path, size=1.0))
         
         # If settings dropdowns exist, refresh their state
-        if hasattr(self, "guild_selector"):
+        if hasattr(self, "guild_selector") and self.guild_selector is not None:
             GLib.idle_add(self.load_guilds)
 
     def on_key_down(self) -> None:
