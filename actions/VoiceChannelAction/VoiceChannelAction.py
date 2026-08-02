@@ -20,6 +20,7 @@ class VoiceChannelAction(ActionBase):
         self.channels_map = []
         self._loading_guilds = False
         self._loading_channels = False
+        self.current_channel_id = None
 
     def on_ready(self) -> None:
         # Ensure we have image control so our icon is displayed by default
@@ -36,38 +37,75 @@ class VoiceChannelAction(ActionBase):
             logger.error(f"Error ensuring image control: {e}")
 
         # Register callbacks and event handlers
-        self.plugin_base.discord_client.register_connection_callback(self.on_connection_change)
+        client = self.plugin_base.discord_client
+        client.register_connection_callback(self.on_connection_change)
+        client.register_event_handler("VOICE_CHANNEL_SELECT", self.on_voice_channel_select)
 
         # Initialize visual state based on current connection status
-        self.on_connection_change(self.plugin_base.discord_client.connected and self.plugin_base.discord_client.authenticated)
+        self.on_connection_change(client.connected and client.authenticated)
 
     def on_connection_change(self, is_connected: bool):
         if not is_connected:
+            self.current_channel_id = None
             media_path = os.path.join(self.plugin_base.PATH, "assets", "voice_channel_disconnected.png")
             if os.path.exists(media_path):
                 GLib.idle_add(lambda: self.set_media(media_path=media_path, size=1.0))
         else:
-            media_path = os.path.join(self.plugin_base.PATH, "assets", "voice_channel.png")
-            if os.path.exists(media_path):
-                GLib.idle_add(lambda: self.set_media(media_path=media_path, size=1.0))
+            client = self.plugin_base.discord_client
+            client.get_selected_voice_channel(self.on_get_selected_voice_channel)
+            client.subscribe("VOICE_CHANNEL_SELECT")
         
         # If settings dropdowns exist, refresh their state
         if hasattr(self, "guild_selector"):
             GLib.idle_add(self.load_guilds)
 
+    def on_voice_channel_select(self, data: dict):
+        channel_id = data.get("channel_id")
+        self.update_channel_state(channel_id)
+
+    def on_get_selected_voice_channel(self, payload: dict):
+        data = payload.get("data")
+        channel_id = data.get("id") if isinstance(data, dict) else None
+        self.update_channel_state(channel_id)
+
+    def update_channel_state(self, current_channel_id: Optional[str]):
+        self.current_channel_id = current_channel_id
+        settings = self.get_settings() or {}
+        target_channel_id = settings.get("channel_id", "").strip()
+
+        if target_channel_id in ["", "0"]:
+            media_name = "voice_channel.png"
+        elif current_channel_id and current_channel_id == target_channel_id:
+            media_name = "voice_channel_active.png"
+        else:
+            media_name = "voice_channel.png"
+
+        media_path = os.path.join(self.plugin_base.PATH, "assets", media_name)
+        if os.path.exists(media_path):
+            GLib.idle_add(lambda: self.set_media(media_path=media_path, size=1.0))
+
     def on_key_down(self) -> None:
-        if not self.plugin_base.discord_client.connected or not self.plugin_base.discord_client.authenticated:
+        client = self.plugin_base.discord_client
+        if not client.connected or not client.authenticated:
             logger.warning("VoiceChannelAction: Discord client not connected or authenticated.")
             return
             
         settings = self.get_settings() or {}
         channel_id = settings.get("channel_id", "").strip()
-        if not channel_id:
-            logger.warning("VoiceChannelAction: No Channel ID configured.")
+
+        # Explicit Disconnect button or unconfigured
+        if channel_id in ["", "0"]:
+            logger.info("VoiceChannelAction: Disconnecting from voice channel.")
+            client.select_voice_channel(channel_id=None)
             return
-            
-        logger.info(f"VoiceChannelAction: Joining voice channel {channel_id}")
-        self.plugin_base.discord_client.select_voice_channel(channel_id=channel_id)
+
+        # Toggle: Leave if already in this channel, otherwise Join
+        if self.current_channel_id == channel_id:
+            logger.info(f"VoiceChannelAction: Leaving voice channel {channel_id}")
+            client.select_voice_channel(channel_id=None)
+        else:
+            logger.info(f"VoiceChannelAction: Joining voice channel {channel_id}")
+            client.select_voice_channel(channel_id=channel_id)
 
     def on_key_up(self) -> None:
         pass
@@ -190,7 +228,9 @@ class VoiceChannelAction(ActionBase):
                     # Filter for voice channels (type 2) and stage channels (type 13)
                     filtered = [c for c in channels if c.get("type") in [2, 13]]
                     filtered_sorted = sorted(filtered, key=lambda c: c.get("name", "").lower())
-                    self.channels_map = [(c.get("id"), c.get("name")) for c in filtered_sorted]
+
+                    # Prepend Disconnect / Leave Voice option (ID "0")
+                    self.channels_map = [("0", "Disconnect / Leave Voice")] + [(c.get("id"), c.get("name")) for c in filtered_sorted]
                     
                     self.channel_model = Gtk.StringList()
                     if not self.channels_map:
@@ -244,3 +284,4 @@ class VoiceChannelAction(ActionBase):
             settings = self.get_settings() or {}
             settings["channel_id"] = channel_id
             self.set_settings(settings)
+            self.update_channel_state(self.current_channel_id)

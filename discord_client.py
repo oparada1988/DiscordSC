@@ -714,6 +714,10 @@ class DiscordIPCClient:
         }
         self.send_command("SELECT_VOICE_CHANNEL", args=args, callback=callback)
 
+    def get_selected_voice_channel(self, callback: Callable[[Dict[str, Any]], None]):
+        """Get currently selected voice channel"""
+        self.send_command("GET_SELECTED_VOICE_CHANNEL", callback=callback)
+
     def select_text_channel(self, channel_id: Optional[str] = None, callback: Optional[Callable[[Dict[str, Any]], None]] = None):
         """Select a text channel"""
         args = {
