@@ -262,8 +262,8 @@ class VoiceChannelAction(ActionBase):
         if not client.connected or not client.authenticated:
             return
 
-        # If cached channels exist in memory, populate UI immediately
-        if self.channels_map:
+        # If cached channels exist for THIS specific guild_id, populate UI immediately
+        if self.channels_map and getattr(self, "cached_channels_guild_id", None) == guild_id:
             self._loading_channels = True
             try:
                 self.channel_model = Gtk.StringList()
@@ -305,6 +305,7 @@ class VoiceChannelAction(ActionBase):
                     filtered = [c for c in channels if c.get("type") in [2, 13]]
                     filtered_sorted = sorted(filtered, key=lambda c: c.get("name", "").lower())
                     self.channels_map = [(c.get("id"), c.get("name")) for c in filtered_sorted]
+                    self.cached_channels_guild_id = guild_id
                     
                     self.channel_model = Gtk.StringList()
                     if not self.channels_map:
@@ -345,6 +346,10 @@ class VoiceChannelAction(ActionBase):
             settings = self.get_settings() or {}
             settings["guild_id"] = guild_id
             self.set_settings(settings)
+            
+            # Clear old channels cache when changing guild
+            self.channels_map = []
+            self.cached_channels_guild_id = None
             
             # Load channels for the newly selected guild
             self.load_channels(guild_id)

@@ -73,11 +73,12 @@ jobs:
       - name: Check for Store Token Secret
         id: check_secret
         run: |
-          if [ -n "${{ secrets.STORE_ACCESS_TOKEN }}" ] || [ -n "${{ secrets.STORE_AUTOMATION_TOKEN }}" ]; then
+          TOKEN="${{ secrets.STORE_ACCESS_TOKEN || secrets.STORE_AUTOMATION_TOKEN || secrets.STORE_TOKEN || secrets.GH_PAT || secrets.PERSONAL_ACCESS_TOKEN || secrets.PAT || secrets.STORE_REPO_TOKEN }}"
+          if [ -n "$TOKEN" ]; then
             echo "HAS_SECRET=true" >> $GITHUB_ENV
           else
             echo "HAS_SECRET=false" >> $GITHUB_ENV
-            echo "::warning::STORE_ACCESS_TOKEN or STORE_AUTOMATION_TOKEN secret is not set in GitHub repository settings. Store repository update skipped."
+            echo "::warning::Store access secret token is not set in GitHub repository settings. Store repository update skipped."
           fi
 
       - name: Checkout Store Repository
@@ -85,7 +86,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: oparada1988/StreamController-Store
-          token: ${{ secrets.STORE_ACCESS_TOKEN || secrets.STORE_AUTOMATION_TOKEN }}
+          token: ${{ secrets.STORE_ACCESS_TOKEN || secrets.STORE_AUTOMATION_TOKEN || secrets.STORE_TOKEN || secrets.GH_PAT || secrets.PERSONAL_ACCESS_TOKEN || secrets.PAT || secrets.STORE_REPO_TOKEN }}
           path: store
           ref: main
 
