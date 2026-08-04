@@ -207,13 +207,12 @@ class VoiceChannelAction(ActionBase):
         settings = self.get_settings() or {}
         guild_id = settings.get("guild_id", "").strip()
         target_channel_id = settings.get("channel_id", "").strip()
-        disconnect_on_press = settings.get("disconnect_on_press", True)
         use_server_icon = settings.get("use_server_icon", False)
 
         client = self.plugin_base.discord_client
 
         # Active state: ALWAYS display green active icon when connected to this voice channel
-        if current_channel_id and target_channel_id and current_channel_id == target_channel_id and disconnect_on_press:
+        if current_channel_id and target_channel_id and current_channel_id == target_channel_id:
             media_path = os.path.join(self.plugin_base.PATH, "assets", "voice_channel_active.png")
         elif not client.connected or not client.authenticated:
             media_path = os.path.join(self.plugin_base.PATH, "assets", "voice_channel_disconnected.png")
@@ -237,19 +236,15 @@ class VoiceChannelAction(ActionBase):
             
         settings = self.get_settings() or {}
         channel_id = settings.get("channel_id", "").strip()
-        disconnect_on_press = settings.get("disconnect_on_press", True)
 
         if not channel_id:
             logger.warning("VoiceChannelAction: No Channel ID configured.")
             return
 
-        # Check channel state and toggle setting:
+        # Standard behavior: Pressing active channel button leaves voice, pressing any other channel button switches to it
         if self.current_channel_id == channel_id:
-            if disconnect_on_press:
-                logger.info(f"VoiceChannelAction: Leaving voice channel {channel_id}")
-                client.select_voice_channel(channel_id=None)
-            else:
-                logger.info(f"VoiceChannelAction: Already in voice channel {channel_id} and 'Leave Voice on Press' is disabled. Remaining in channel.")
+            logger.info(f"VoiceChannelAction: Leaving voice channel {channel_id}")
+            client.select_voice_channel(channel_id=None)
         else:
             logger.info(f"VoiceChannelAction: Joining voice channel {channel_id}")
             client.select_voice_channel(channel_id=channel_id, force=True)
@@ -274,13 +269,6 @@ class VoiceChannelAction(ActionBase):
 
         settings = self.get_settings() or {}
 
-        self.disconnect_switch = Adw.SwitchRow(
-            title="Leave Voice on Press",
-            subtitle="Disconnect from channel when pressed while active"
-        )
-        self.disconnect_switch.set_active(settings.get("disconnect_on_press", True))
-        self.disconnect_switch.connect("notify::active", self.on_disconnect_switch_changed)
-
         self.server_icon_switch = Adw.SwitchRow(
             title="Display Server Icon",
             subtitle="Show Discord server icon when inactive"
@@ -295,20 +283,13 @@ class VoiceChannelAction(ActionBase):
         def on_destroy(widget):
             self.guild_selector = None
             self.channel_selector = None
-            self.disconnect_switch = None
             self.server_icon_switch = None
             self.guild_model = None
             self.channel_model = None
 
         self.guild_selector.connect("destroy", on_destroy)
 
-        return [self.guild_selector, self.channel_selector, self.disconnect_switch, self.server_icon_switch]
-
-    def on_disconnect_switch_changed(self, switch, *args):
-        settings = self.get_settings() or {}
-        settings["disconnect_on_press"] = switch.get_active()
-        self.set_settings(settings)
-        self.update_channel_state(self.current_channel_id)
+        return [self.guild_selector, self.channel_selector, self.server_icon_switch]
 
     def on_server_icon_switch_changed(self, switch, *args):
         settings = self.get_settings() or {}
