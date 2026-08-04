@@ -184,7 +184,7 @@ class VoiceChannelAction(ActionBase):
                 logger.info(f"VoiceChannelAction: Already in voice channel {channel_id} and 'Leave Voice on Press' is disabled. Remaining in channel.")
         else:
             logger.info(f"VoiceChannelAction: Joining voice channel {channel_id}")
-            client.select_voice_channel(channel_id=channel_id)
+            client.select_voice_channel(channel_id=channel_id, force=True)
 
     def on_key_up(self) -> None:
         pass
