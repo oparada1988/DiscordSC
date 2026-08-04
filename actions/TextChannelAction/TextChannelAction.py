@@ -86,6 +86,7 @@ class TextChannelAction(ActionBase):
                 def on_guilds(payload: dict):
                     data = payload.get("data", {})
                     guilds = data.get("guilds", [])
+                    self._store_guild_icons(guilds)
                     guilds_sorted = sorted(guilds, key=lambda g: g.get("name", "").lower())
                     self.guilds_map = [("", "Select a Server...")] + [(g.get("id"), g.get("name")) for g in guilds_sorted]
                     fetch_channels_and_apply()
@@ -116,15 +117,79 @@ class TextChannelAction(ActionBase):
         # Initialize visual state based on current connection status
         self.on_connection_change(self.plugin_base.discord_client.connected and self.plugin_base.discord_client.authenticated)
 
+    def _store_guild_icons(self, guilds: list):
+        if not hasattr(self.plugin_base, "guild_icons_map"):
+            self.plugin_base.guild_icons_map = {}
+        for g in guilds:
+            g_id = g.get("id")
+            if not g_id:
+                continue
+            icon_url = g.get("icon_url")
+            icon_hash = g.get("icon")
+            if icon_url:
+                self.plugin_base.guild_icons_map[g_id] = icon_url
+            elif icon_hash:
+                self.plugin_base.guild_icons_map[g_id] = f"https://cdn.discordapp.com/icons/{g_id}/{icon_hash}.png?size=128"
+
+    def get_or_fetch_server_icon(self, guild_id: str):
+        if not guild_id:
+            return None
+
+        cache_dir = os.path.join(self.plugin_base.PATH, "assets", "cache", "guild_icons")
+        os.makedirs(cache_dir, exist_ok=True)
+        cached_file = os.path.join(cache_dir, f"{guild_id}.png")
+
+        if os.path.exists(cached_file):
+            return cached_file
+
+        icons_map = getattr(self.plugin_base, "guild_icons_map", {})
+        icon_url = icons_map.get(guild_id)
+        if not icon_url:
+            return None
+
+        if not hasattr(self, "_fetching_icons"):
+            self._fetching_icons = set()
+
+        if guild_id not in self._fetching_icons:
+            self._fetching_icons.add(guild_id)
+
+            def download():
+                try:
+                    import urllib.request
+                    req = urllib.request.Request(icon_url, headers={"User-Agent": "Mozilla/5.0"})
+                    with urllib.request.urlopen(req, timeout=5) as resp:
+                        data = resp.read()
+                        with open(cached_file, "wb") as f:
+                            f.write(data)
+                    logger.info(f"Downloaded server icon for guild {guild_id}")
+                    GLib.idle_add(lambda: self.on_connection_change(self.plugin_base.discord_client.connected and self.plugin_base.discord_client.authenticated))
+                except Exception as e:
+                    logger.error(f"Failed to download server icon for guild {guild_id}: {e}")
+                finally:
+                    self._fetching_icons.discard(guild_id)
+
+            threading.Thread(target=download, daemon=True).start()
+
+        return None
+
     def on_connection_change(self, is_connected: bool):
+        settings = self.get_settings() or {}
+        guild_id = settings.get("guild_id", "").strip()
+        use_server_icon = settings.get("use_server_icon", False)
+
         if not is_connected:
             media_path = os.path.join(self.plugin_base.PATH, "assets", "text_channel_disconnected.png")
-            if os.path.exists(media_path):
-                GLib.idle_add(lambda: self.set_media(media_path=media_path, size=1.0))
+        elif use_server_icon and guild_id:
+            server_icon = self.get_or_fetch_server_icon(guild_id)
+            if server_icon and os.path.exists(server_icon):
+                media_path = server_icon
+            else:
+                media_path = os.path.join(self.plugin_base.PATH, "assets", "text_channel.png")
         else:
             media_path = os.path.join(self.plugin_base.PATH, "assets", "text_channel.png")
-            if os.path.exists(media_path):
-                GLib.idle_add(lambda: self.set_media(media_path=media_path, size=1.0))
+
+        if media_path and os.path.exists(media_path):
+            GLib.idle_add(lambda: self.set_media(media_path=media_path, size=1.0))
         
         self.update_labels()
 
@@ -164,6 +229,15 @@ class TextChannelAction(ActionBase):
         )
         self.channel_selector.connect("notify::selected-item", self.on_channel_changed)
 
+        settings = self.get_settings() or {}
+
+        self.server_icon_switch = Adw.SwitchRow(
+            title="Display Server Icon",
+            subtitle="Show Discord server icon as key image"
+        )
+        self.server_icon_switch.set_active(settings.get("use_server_icon", False))
+        self.server_icon_switch.connect("notify::active", self.on_server_icon_switch_changed)
+
         # Trigger initial loading of servers
         self.load_guilds()
 
@@ -171,12 +245,19 @@ class TextChannelAction(ActionBase):
         def on_destroy(widget):
             self.guild_selector = None
             self.channel_selector = None
+            self.server_icon_switch = None
             self.guild_model = None
             self.channel_model = None
 
         self.guild_selector.connect("destroy", on_destroy)
 
-        return [self.guild_selector, self.channel_selector]
+        return [self.guild_selector, self.channel_selector, self.server_icon_switch]
+
+    def on_server_icon_switch_changed(self, switch, *args):
+        settings = self.get_settings() or {}
+        settings["use_server_icon"] = switch.get_active()
+        self.set_settings(settings)
+        self.on_connection_change(self.plugin_base.discord_client.connected and self.plugin_base.discord_client.authenticated)
 
     def load_guilds(self):
         client = self.plugin_base.discord_client
@@ -243,6 +324,7 @@ class TextChannelAction(ActionBase):
                 try:
                     data = payload.get("data", {})
                     guilds = data.get("guilds", [])
+                    self._store_guild_icons(guilds)
                     guilds_sorted = sorted(guilds, key=lambda g: g.get("name", "").lower())
                     self.guilds_map = [("", "Select a Server...")] + [(g.get("id"), g.get("name")) for g in guilds_sorted]
                     

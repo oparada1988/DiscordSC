@@ -88,6 +88,7 @@ class VoiceChannelAction(ActionBase):
                 def on_guilds(payload: dict):
                     data = payload.get("data", {})
                     guilds = data.get("guilds", [])
+                    self._store_guild_icons(guilds)
                     guilds_sorted = sorted(guilds, key=lambda g: g.get("name", "").lower())
                     self.guilds_map = [("", "Select a Server...")] + [(g.get("id"), g.get("name")) for g in guilds_sorted]
                     fetch_channels_and_apply()
@@ -146,19 +147,86 @@ class VoiceChannelAction(ActionBase):
         channel_id = data.get("id") if isinstance(data, dict) else None
         self.update_channel_state(channel_id)
 
+    def _store_guild_icons(self, guilds: list):
+        if not hasattr(self.plugin_base, "guild_icons_map"):
+            self.plugin_base.guild_icons_map = {}
+        for g in guilds:
+            g_id = g.get("id")
+            if not g_id:
+                continue
+            icon_url = g.get("icon_url")
+            icon_hash = g.get("icon")
+            if icon_url:
+                self.plugin_base.guild_icons_map[g_id] = icon_url
+            elif icon_hash:
+                self.plugin_base.guild_icons_map[g_id] = f"https://cdn.discordapp.com/icons/{g_id}/{icon_hash}.png?size=128"
+
+    def get_or_fetch_server_icon(self, guild_id: str) -> Optional[str]:
+        if not guild_id:
+            return None
+
+        cache_dir = os.path.join(self.plugin_base.PATH, "assets", "cache", "guild_icons")
+        os.makedirs(cache_dir, exist_ok=True)
+        cached_file = os.path.join(cache_dir, f"{guild_id}.png")
+
+        if os.path.exists(cached_file):
+            return cached_file
+
+        icons_map = getattr(self.plugin_base, "guild_icons_map", {})
+        icon_url = icons_map.get(guild_id)
+        if not icon_url:
+            return None
+
+        if not hasattr(self, "_fetching_icons"):
+            self._fetching_icons = set()
+
+        if guild_id not in self._fetching_icons:
+            self._fetching_icons.add(guild_id)
+
+            def download():
+                try:
+                    import urllib.request
+                    req = urllib.request.Request(icon_url, headers={"User-Agent": "Mozilla/5.0"})
+                    with urllib.request.urlopen(req, timeout=5) as resp:
+                        data = resp.read()
+                        with open(cached_file, "wb") as f:
+                            f.write(data)
+                    logger.info(f"Downloaded server icon for guild {guild_id}")
+                    GLib.idle_add(lambda: self.update_channel_state(self.current_channel_id))
+                except Exception as e:
+                    logger.error(f"Failed to download server icon for guild {guild_id}: {e}")
+                finally:
+                    self._fetching_icons.discard(guild_id)
+
+            threading.Thread(target=download, daemon=True).start()
+
+        return None
+
     def update_channel_state(self, current_channel_id: Optional[str]):
         self.current_channel_id = current_channel_id
         settings = self.get_settings() or {}
+        guild_id = settings.get("guild_id", "").strip()
         target_channel_id = settings.get("channel_id", "").strip()
         disconnect_on_press = settings.get("disconnect_on_press", True)
+        use_server_icon = settings.get("use_server_icon", False)
 
+        client = self.plugin_base.discord_client
+
+        # Active state: ALWAYS display green active icon when connected to this voice channel
         if current_channel_id and target_channel_id and current_channel_id == target_channel_id and disconnect_on_press:
-            media_name = "voice_channel_active.png"
+            media_path = os.path.join(self.plugin_base.PATH, "assets", "voice_channel_active.png")
+        elif not client.connected or not client.authenticated:
+            media_path = os.path.join(self.plugin_base.PATH, "assets", "voice_channel_disconnected.png")
+        elif use_server_icon and guild_id:
+            server_icon = self.get_or_fetch_server_icon(guild_id)
+            if server_icon and os.path.exists(server_icon):
+                media_path = server_icon
+            else:
+                media_path = os.path.join(self.plugin_base.PATH, "assets", "voice_channel.png")
         else:
-            media_name = "voice_channel.png"
+            media_path = os.path.join(self.plugin_base.PATH, "assets", "voice_channel.png")
 
-        media_path = os.path.join(self.plugin_base.PATH, "assets", media_name)
-        if os.path.exists(media_path):
+        if media_path and os.path.exists(media_path):
             GLib.idle_add(lambda: self.set_media(media_path=media_path, size=1.0))
 
     def on_key_down(self) -> None:
@@ -213,6 +281,13 @@ class VoiceChannelAction(ActionBase):
         self.disconnect_switch.set_active(settings.get("disconnect_on_press", True))
         self.disconnect_switch.connect("notify::active", self.on_disconnect_switch_changed)
 
+        self.server_icon_switch = Adw.SwitchRow(
+            title="Display Server Icon",
+            subtitle="Show Discord server icon when inactive"
+        )
+        self.server_icon_switch.set_active(settings.get("use_server_icon", False))
+        self.server_icon_switch.connect("notify::active", self.on_server_icon_switch_changed)
+
         # Trigger initial loading / rendering of servers
         self.load_guilds()
 
@@ -221,16 +296,23 @@ class VoiceChannelAction(ActionBase):
             self.guild_selector = None
             self.channel_selector = None
             self.disconnect_switch = None
+            self.server_icon_switch = None
             self.guild_model = None
             self.channel_model = None
 
         self.guild_selector.connect("destroy", on_destroy)
 
-        return [self.guild_selector, self.channel_selector, self.disconnect_switch]
+        return [self.guild_selector, self.channel_selector, self.disconnect_switch, self.server_icon_switch]
 
     def on_disconnect_switch_changed(self, switch, *args):
         settings = self.get_settings() or {}
         settings["disconnect_on_press"] = switch.get_active()
+        self.set_settings(settings)
+        self.update_channel_state(self.current_channel_id)
+
+    def on_server_icon_switch_changed(self, switch, *args):
+        settings = self.get_settings() or {}
+        settings["use_server_icon"] = switch.get_active()
         self.set_settings(settings)
         self.update_channel_state(self.current_channel_id)
 
@@ -299,6 +381,7 @@ class VoiceChannelAction(ActionBase):
                 try:
                     data = payload.get("data", {})
                     guilds = data.get("guilds", [])
+                    self._store_guild_icons(guilds)
                     guilds_sorted = sorted(guilds, key=lambda g: g.get("name", "").lower())
                     self.guilds_map = [("", "Select a Server...")] + [(g.get("id"), g.get("name")) for g in guilds_sorted]
                     
