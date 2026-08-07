@@ -15,7 +15,7 @@
         "Communication"
     ],
     "minimum-version": "1.0.0",
-    "app-version": "2.0.0",
+    "app-version": "1.0.0",
     "description": "Control your Discord client's mute, deafen, notifications, server status, and input modes directly from your StreamController deck.",
     "short-description": "Discord Integration for StreamController"
 }
