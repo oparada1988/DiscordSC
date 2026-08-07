@@ -1,3 +1,11 @@
+# DiscordSC Version 1.2.1 Changelog
+
+### Version 1.2.1 Improvements
+* **Input Mode Action (`InputModeAction`)**: Updated to strictly change Discord's voice input setting between Push to Talk (`PUSH_TO_TALK`) and Voice Activity (`VOICE_ACTIVITY`) without altering microphone mute state.
+* **Push to Talk Action (`PushToTalkAction`)**: Updated to mute microphone by default when idle, unmuting on key hold down to speak and re-muting upon release.
+
+---
+
 # DiscordSC Version 1.2.0 Changelog
 
 Version 1.2.0 is a major release for DiscordSC. This update introduces brand-new interactive actions, real-time server presence tracking, Wayland and Flatpak compatibility improvements, dynamic badge scaling for large user counts, and status labels across all actions.
