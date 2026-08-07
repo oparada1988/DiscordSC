@@ -1,3 +1,11 @@
+# DiscordSC Version 1.2.2 Changelog
+
+### Version 1.2.2 Improvements
+* **Disconnected Status Label Uniformity**: All 6 plugin actions now uniformly display "Disconnected" on their bottom label when Discord is not running or disconnected.
+* **Server Name Hiding on Channel Actions**: `VoiceChannelAction` and `TextChannelAction` now hide top label server names when Discord is disconnected.
+
+---
+
 # DiscordSC Version 1.2.1 Changelog
 
 ### Version 1.2.1 Improvements

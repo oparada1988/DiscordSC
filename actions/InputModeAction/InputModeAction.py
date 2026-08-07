@@ -46,14 +46,12 @@ class InputModeAction(ActionBase):
             logger.info(f"InputModeAction: Discord disconnected. Setting disconnected media for mode {self.current_mode}.")
             if self.current_mode == "VOICE_ACTIVITY":
                 media_path = os.path.join(self.plugin_base.PATH, "assets", "input_voice_activity_disconnected.png")
-                label_text = "Voice Activity"
             else:
                 media_path = os.path.join(self.plugin_base.PATH, "assets", "input_push_to_talk_disconnected.png")
-                label_text = "Push To Talk"
 
             if os.path.exists(media_path):
                 GLib.idle_add(lambda: self.set_media(media_path=media_path, size=1.0))
-            self.set_bottom_label(label_text, font_size=12)
+            self.set_bottom_label("Disconnected", font_size=12)
         else:
             logger.info("InputModeAction: Discord connected & authenticated. Fetching voice settings...")
             self.plugin_base.discord_client.get_voice_settings(self.on_voice_settings)
@@ -74,18 +72,16 @@ class InputModeAction(ActionBase):
         self.current_mode = mode_type
         is_connected = self.plugin_base.discord_client.connected and self.plugin_base.discord_client.authenticated
 
+        if not is_connected:
+            self.set_bottom_label("Disconnected", font_size=12)
+            return
+
         if mode_type == "VOICE_ACTIVITY":
             label_text = "Voice Activity"
-            if is_connected:
-                media_path = os.path.join(self.plugin_base.PATH, "assets", "input_voice_activity.png")
-            else:
-                media_path = os.path.join(self.plugin_base.PATH, "assets", "input_voice_activity_disconnected.png")
+            media_path = os.path.join(self.plugin_base.PATH, "assets", "input_voice_activity.png")
         else:
             label_text = "Push To Talk"
-            if is_connected:
-                media_path = os.path.join(self.plugin_base.PATH, "assets", "input_push_to_talk.png")
-            else:
-                media_path = os.path.join(self.plugin_base.PATH, "assets", "input_push_to_talk_disconnected.png")
+            media_path = os.path.join(self.plugin_base.PATH, "assets", "input_push_to_talk.png")
 
         if os.path.exists(media_path):
             GLib.idle_add(lambda: self.set_media(media_path=media_path, size=1.0))

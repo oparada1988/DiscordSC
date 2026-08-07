@@ -85,6 +85,7 @@ class ServerStatusAction(ActionBase):
             if not os.path.exists(media_path):
                 media_path = os.path.join(self.plugin_base.PATH, "assets", "server_status.png")
             GLib.idle_add(lambda: self.set_media(media_path=media_path, size=1.0))
+            self.set_bottom_label("Disconnected", font_size=12)
         else:
             self.update_server_status()
 

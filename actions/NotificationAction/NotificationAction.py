@@ -90,8 +90,10 @@ class NotificationAction(ActionBase):
             if not os.path.exists(media_path):
                 media_path = self.base_icon_path
             GLib.idle_add(lambda: self.set_media(media_path=media_path, size=1.0))
+            self.set_bottom_label("Disconnected", font_size=12)
         else:
             logger.info("NotificationAction: Discord connected & authenticated. Syncing pending notifications...")
+            self.set_bottom_label("")
             self.plugin_base.discord_client.subscribe("NOTIFICATION_CREATE")
             
             # Prefetch avatars for all loaded pending notifications

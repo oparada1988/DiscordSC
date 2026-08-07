@@ -60,7 +60,8 @@ class TextChannelAction(ActionBase):
                 self.set_bottom_label(channel_name)
 
             if not self.plugin_base.discord_client.connected or not self.plugin_base.discord_client.authenticated:
-                apply_labels()
+                self.set_top_label("")
+                self.set_bottom_label("Disconnected", font_size=12)
                 return
 
             if not guild_id:
