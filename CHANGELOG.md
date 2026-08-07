@@ -1,6 +1,6 @@
-# DiscordSC Version 2.0.0 Changelog
+# DiscordSC Version 1.2.0 Changelog
 
-Version 2.0.0 is a major release for DiscordSC. This update introduces brand-new interactive actions, real-time server presence tracking, Wayland and Flatpak compatibility improvements, dynamic badge scaling for large user counts, and status labels across all actions.
+Version 1.2.0 is a major release for DiscordSC. This update introduces brand-new interactive actions, real-time server presence tracking, Wayland and Flatpak compatibility improvements, dynamic badge scaling for large user counts, and status labels across all actions.
 
 ---
 
