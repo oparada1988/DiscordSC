@@ -87,6 +87,7 @@ class ServerStatusAction(ActionBase):
             GLib.idle_add(lambda: self.set_media(media_path=media_path, size=1.0))
             self.set_bottom_label("Disconnected", font_size=12)
         else:
+            self.set_bottom_label("")
             self.update_server_status()
 
         if hasattr(self, "guild_selector") and self.guild_selector is not None:
@@ -234,6 +235,9 @@ class ServerStatusAction(ActionBase):
         settings = self.get_settings() or {}
         guild_id = settings.get("guild_id", "").strip()
         use_server_icon = settings.get("use_server_icon", True)
+
+        if self.plugin_base.discord_client.connected and self.plugin_base.discord_client.authenticated:
+            self.set_bottom_label("")
 
         if not guild_id:
             base_default = os.path.join(self.plugin_base.PATH, "assets", "server_status.png")
