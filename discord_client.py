@@ -475,7 +475,7 @@ class DiscordIPCClient:
         
         args = {
             "client_id": self.client_id,
-            "scopes": ["rpc", "rpc.voice.read", "rpc.voice.write"]
+            "scopes": ["rpc", "rpc.notifications.read", "rpc.voice.read", "rpc.voice.write", "messages.read"]
         }
         
         def on_auth_response(payload: Dict[str, Any]):
@@ -684,7 +684,15 @@ class DiscordIPCClient:
     def subscribe(self, event: str, callback: Optional[Callable[[Dict[str, Any]], None]] = None):
         """Subscribe to dispatch events"""
         logger.info(f"Subscribing to event: {event}")
-        self.send_command("SUBSCRIBE", evt=event, callback=callback)
+        def on_sub_response(payload: Dict[str, Any]):
+            if payload.get("evt") == "ERROR":
+                logger.warning(f"Subscription to {event} failed with ERROR: {payload.get('data')}")
+                if event == "NOTIFICATION_CREATE" and self.client_id:
+                    logger.info("Attempting auto-authorization to request notification permissions...")
+                    self.auto_authorize()
+            if callback:
+                callback(payload)
+        self.send_command("SUBSCRIBE", evt=event, callback=on_sub_response)
 
     def register_event_handler(self, event: str, handler: Callable[[Dict[str, Any]], None]):
         if event not in self.event_handlers:
@@ -697,14 +705,25 @@ class DiscordIPCClient:
         """Get voice settings"""
         self.send_command("GET_VOICE_SETTINGS", callback=callback)
 
-    def set_voice_settings(self, mute: Optional[bool] = None, deaf: Optional[bool] = None, callback: Optional[Callable[[Dict[str, Any]], None]] = None):
+    def set_voice_settings(self, mute: Optional[bool] = None, deaf: Optional[bool] = None, mode_type: Optional[str] = None, callback: Optional[Callable[[Dict[str, Any]], None]] = None):
         """Set voice settings"""
         args = {}
         if mute is not None:
             args["mute"] = mute
         if deaf is not None:
             args["deaf"] = deaf
+        if mode_type is not None:
+            args["mode"] = {"type": mode_type}
             
+        self.send_command("SET_VOICE_SETTINGS", args=args, callback=callback)
+
+    def set_voice_input_mode(self, mode_type: str, callback: Optional[Callable[[Dict[str, Any]], None]] = None):
+        """Set voice input mode ('PUSH_TO_TALK' or 'VOICE_ACTIVITY')"""
+        args = {
+            "mode": {
+                "type": mode_type
+            }
+        }
         self.send_command("SET_VOICE_SETTINGS", args=args, callback=callback)
 
     def select_voice_channel(self, channel_id: Optional[str] = None, force: bool = True, callback: Optional[Callable[[Dict[str, Any]], None]] = None):
@@ -736,3 +755,10 @@ class DiscordIPCClient:
             "guild_id": guild_id
         }
         self.send_command("GET_CHANNELS", args=args, callback=callback)
+
+    def get_guild(self, guild_id: str, callback: Callable[[Dict[str, Any]], None]):
+        """Get details for a specific guild (server)"""
+        args = {
+            "guild_id": guild_id
+        }
+        self.send_command("GET_GUILD", args=args, callback=callback)

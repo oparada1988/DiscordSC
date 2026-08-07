@@ -22,6 +22,9 @@ from .actions.DeafenAction.DeafenAction import DeafenAction
 from .actions.TextChannelAction.TextChannelAction import TextChannelAction
 from .actions.VoiceChannelAction.VoiceChannelAction import VoiceChannelAction
 from .actions.PushToTalkAction.PushToTalkAction import PushToTalkAction
+from .actions.NotificationAction.NotificationAction import NotificationAction
+from .actions.ServerStatusAction.ServerStatusAction import ServerStatusAction
+from .actions.InputModeAction.InputModeAction import InputModeAction
 
 class PluginTemplate(PluginBase):
     def __init__(self):
@@ -120,6 +123,48 @@ class PluginTemplate(PluginBase):
             }
         )
         self.add_action_holder(self.push_to_talk_action_holder)
+
+        self.notification_action_holder = ActionHolder(
+            plugin_base=self,
+            action_base=NotificationAction,
+            action_id="com_oparada_DiscordSC::NotificationAction",
+            action_name="Discord Notifications",
+            icon=Gtk.Image(file=os.path.join(self.PATH, "assets", "action-notification.png")),
+            action_support={
+                Input.Key: ActionInputSupport.SUPPORTED,
+                Input.Dial: ActionInputSupport.UNTESTED,
+                Input.Touchscreen: ActionInputSupport.UNTESTED
+            }
+        )
+        self.add_action_holder(self.notification_action_holder)
+
+        self.server_status_action_holder = ActionHolder(
+            plugin_base=self,
+            action_base=ServerStatusAction,
+            action_id="com_oparada_DiscordSC::ServerStatusAction",
+            action_name="Server Status",
+            icon=Gtk.Image(file=os.path.join(self.PATH, "assets", "action-server-status.png")),
+            action_support={
+                Input.Key: ActionInputSupport.SUPPORTED,
+                Input.Dial: ActionInputSupport.UNTESTED,
+                Input.Touchscreen: ActionInputSupport.UNTESTED
+            }
+        )
+        self.add_action_holder(self.server_status_action_holder)
+
+        self.input_mode_action_holder = ActionHolder(
+            plugin_base=self,
+            action_base=InputModeAction,
+            action_id="com_oparada_DiscordSC::InputModeAction",
+            action_name="Discord Input Mode",
+            icon=Gtk.Image(file=os.path.join(self.PATH, "assets", "action-input-mode.png")),
+            action_support={
+                Input.Key: ActionInputSupport.SUPPORTED,
+                Input.Dial: ActionInputSupport.UNTESTED,
+                Input.Touchscreen: ActionInputSupport.UNTESTED
+            }
+        )
+        self.add_action_holder(self.input_mode_action_holder)
 
         # Load manifest version dynamically
         plugin_ver = "1.0.0"

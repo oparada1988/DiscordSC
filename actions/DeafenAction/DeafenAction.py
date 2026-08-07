@@ -7,7 +7,6 @@ from src.backend.PluginManager.PluginBase import PluginBase
 # Import python & gtk modules
 import os
 from loguru import logger
-import threading
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
@@ -19,7 +18,7 @@ class DeafenAction(ActionBase):
         self.is_deaf = False
 
     def on_ready(self) -> None:
-        # Ensure we have image control so our icon is displayed by default
+        # Ensure we have image and label control so our icon and label are displayed by default
         try:
             state = self.get_state()
             if state is not None:
@@ -29,8 +28,11 @@ class DeafenAction(ActionBase):
                     if apm.get_image_control_index() is None or not self.get_is_multi_action():
                         if apm.get_image_control_index() != own_index:
                             apm.set_image_control_index(own_index, reload_pages=False, reload_self=False)
+                    if apm.get_label_control_index(2) is None or not self.get_is_multi_action():
+                        if apm.get_label_control_index(2) != own_index:
+                            apm.set_label_control_index(2, own_index, reload_pages=False, reload_self=False)
         except Exception as e:
-            logger.error(f"Error ensuring image control: {e}")
+            logger.error(f"Error ensuring image/label control: {e}")
 
         # Register callbacks and event handlers
         self.plugin_base.discord_client.register_connection_callback(self.on_connection_change)
@@ -44,6 +46,7 @@ class DeafenAction(ActionBase):
             media_path = os.path.join(self.plugin_base.PATH, "assets", "deafen_disconnected.png")
             if os.path.exists(media_path):
                 GLib.idle_add(lambda: self.set_media(media_path=media_path, size=1.0))
+            self.set_bottom_label("Disconnected", font_size=12)
         else:
             # Fetch current voice settings to sync state
             self.plugin_base.discord_client.get_voice_settings(self.on_voice_settings)
@@ -61,11 +64,14 @@ class DeafenAction(ActionBase):
         self.is_deaf = is_deaf
         if is_deaf:
             media_path = os.path.join(self.plugin_base.PATH, "assets", "deafen.png")
+            label_text = "deafen"
         else:
             media_path = os.path.join(self.plugin_base.PATH, "assets", "undeafen.png")
+            label_text = "undeafen"
             
         if os.path.exists(media_path):
             GLib.idle_add(lambda: self.set_media(media_path=media_path, size=1.0))
+        self.set_bottom_label(label_text, font_size=12)
 
     def on_key_down(self) -> None:
         if not self.plugin_base.discord_client.connected or not self.plugin_base.discord_client.authenticated:

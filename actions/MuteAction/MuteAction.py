@@ -19,7 +19,7 @@ class MuteAction(ActionBase):
         self.is_muted = False
 
     def on_ready(self) -> None:
-        # Ensure we have image control so our icon is displayed by default
+        # Ensure we have image and label control so our icon and label are displayed by default
         try:
             state = self.get_state()
             if state is not None:
@@ -29,8 +29,11 @@ class MuteAction(ActionBase):
                     if apm.get_image_control_index() is None or not self.get_is_multi_action():
                         if apm.get_image_control_index() != own_index:
                             apm.set_image_control_index(own_index, reload_pages=False, reload_self=False)
+                    if apm.get_label_control_index(2) is None or not self.get_is_multi_action():
+                        if apm.get_label_control_index(2) != own_index:
+                            apm.set_label_control_index(2, own_index, reload_pages=False, reload_self=False)
         except Exception as e:
-            logger.error(f"Error ensuring image control: {e}")
+            logger.error(f"Error ensuring image/label control: {e}")
 
         # Register callbacks and event handlers
         self.plugin_base.discord_client.register_connection_callback(self.on_connection_change)
@@ -44,6 +47,7 @@ class MuteAction(ActionBase):
             media_path = os.path.join(self.plugin_base.PATH, "assets", "mute_disconnected.png")
             if os.path.exists(media_path):
                 GLib.idle_add(lambda: self.set_media(media_path=media_path, size=1.0))
+            self.set_bottom_label("Disconnected", font_size=12)
         else:
             # Fetch current voice settings to sync state
             self.plugin_base.discord_client.get_voice_settings(self.on_voice_settings)
@@ -61,11 +65,14 @@ class MuteAction(ActionBase):
         self.is_muted = is_muted
         if is_muted:
             media_path = os.path.join(self.plugin_base.PATH, "assets", "mute.png")
+            label_text = "mute"
         else:
             media_path = os.path.join(self.plugin_base.PATH, "assets", "unmute.png")
+            label_text = "unmute"
             
         if os.path.exists(media_path):
             GLib.idle_add(lambda: self.set_media(media_path=media_path, size=1.0))
+        self.set_bottom_label(label_text, font_size=12)
 
     def on_key_down(self) -> None:
         if not self.plugin_base.discord_client.connected or not self.plugin_base.discord_client.authenticated:
@@ -80,7 +87,6 @@ class MuteAction(ActionBase):
         pass
 
     def get_config_rows(self) -> list:
-        # Simple configuration area for Discord actions
         row = Adw.ActionRow(
             title="Discord Mute Action",
             subtitle="Toggles client mute state and displays status"
