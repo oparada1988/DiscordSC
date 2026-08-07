@@ -26,6 +26,9 @@ class PushToTalkAction(ActionBase):
                     if apm.get_image_control_index() is None or not self.get_is_multi_action():
                         if apm.get_image_control_index() != own_index:
                             apm.set_image_control_index(own_index, reload_pages=False, reload_self=False)
+                    if apm.get_label_control_index(2) is None or not self.get_is_multi_action():
+                        if apm.get_label_control_index(2) != own_index:
+                            apm.set_label_control_index(2, own_index, reload_pages=False, reload_self=False)
         except Exception as e:
             logger.error(f"PushToTalkAction: Error setting image control: {e}")
 
@@ -44,41 +47,43 @@ class PushToTalkAction(ActionBase):
             if os.path.exists(media_path):
                 GLib.idle_add(lambda: self.set_media(media_path=media_path, size=1.0))
             self.set_bottom_label("Push To Talk", font_size=12)
+            # Ensure mic is muted initially in PTT mode
+            self.plugin_base.discord_client.set_voice_settings(mute=True)
 
     def on_key_down(self) -> None:
         if not self.plugin_base.discord_client.connected or not self.plugin_base.discord_client.authenticated:
             logger.warning("PushToTalkAction: Discord client not connected or authenticated.")
             return
 
-        logger.info("PushToTalkAction: PTT key held down -> Activating audio capture & displaying green talking icon")
+        logger.info("PushToTalkAction: Key held down -> Unmuting mic to speak")
         
-        # Update visual display to green talking icon
+        # Display green talking icon while speaking
         media_path = os.path.join(self.plugin_base.PATH, "assets", "push_to_talk_talking.png")
         if os.path.exists(media_path):
             GLib.idle_add(lambda: self.set_media(media_path=media_path, size=1.0))
 
-        # Activate WebRTC audio capture & unmute mic while button is held
-        self.plugin_base.discord_client.set_voice_settings(mode_type="VOICE_ACTIVITY", mute=False)
+        # Unmute mic while button is held down
+        self.plugin_base.discord_client.set_voice_settings(mute=False)
         self.set_bottom_label("Push To Talk", font_size=12)
 
     def on_key_up(self) -> None:
         if not self.plugin_base.discord_client.connected or not self.plugin_base.discord_client.authenticated:
             return
 
-        logger.info("PushToTalkAction: PTT key released -> Restoring Discord setting to PUSH_TO_TALK & muting mic")
+        logger.info("PushToTalkAction: Key released -> Muting mic")
         
-        # Revert visual display to blue idle PTT icon
+        # Restore blue idle PTT icon
         media_path = os.path.join(self.plugin_base.PATH, "assets", "push_to_talk.png")
         if os.path.exists(media_path):
             GLib.idle_add(lambda: self.set_media(media_path=media_path, size=1.0))
 
-        # Restore official Discord mode setting to PUSH_TO_TALK & mute mic when button is released
-        self.plugin_base.discord_client.set_voice_settings(mode_type="PUSH_TO_TALK", mute=True)
+        # Mute mic when button is released
+        self.plugin_base.discord_client.set_voice_settings(mute=True)
         self.set_bottom_label("Push To Talk", font_size=12)
 
     def get_config_rows(self) -> list:
         row = Adw.ActionRow(
             title="Discord Push to Talk Action",
-            subtitle="Hold button down to unmute mic and capture audio while displaying green talking icon."
+            subtitle="Mutes mic by default. Hold button down to unmute mic and speak."
         )
         return [row]

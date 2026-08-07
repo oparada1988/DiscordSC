@@ -6,6 +6,7 @@ from src.backend.PluginManager.PluginBase import PluginBase
 
 # Import python & gtk modules
 import os
+from typing import Dict, Any, Optional
 from loguru import logger
 import gi
 gi.require_version("Gtk", "4.0")
@@ -27,6 +28,9 @@ class InputModeAction(ActionBase):
                     if apm.get_image_control_index() is None or not self.get_is_multi_action():
                         if apm.get_image_control_index() != own_index:
                             apm.set_image_control_index(own_index, reload_pages=False, reload_self=False)
+                    if apm.get_label_control_index(2) is None or not self.get_is_multi_action():
+                        if apm.get_label_control_index(2) != own_index:
+                            apm.set_label_control_index(2, own_index, reload_pages=False, reload_self=False)
         except Exception as e:
             logger.error(f"InputModeAction: Error setting image control: {e}")
 
@@ -94,12 +98,8 @@ class InputModeAction(ActionBase):
             return
 
         new_mode = "VOICE_ACTIVITY" if self.current_mode == "PUSH_TO_TALK" else "PUSH_TO_TALK"
-        logger.info(f"InputModeAction: Setting official Discord voice input mode to {new_mode}")
-        
-        if new_mode == "PUSH_TO_TALK":
-            self.plugin_base.discord_client.set_voice_settings(mode_type="PUSH_TO_TALK", mute=True)
-        else:
-            self.plugin_base.discord_client.set_voice_settings(mode_type="VOICE_ACTIVITY", mute=False)
+        logger.info(f"InputModeAction: Changing Discord voice input setting to {new_mode}")
+        self.plugin_base.discord_client.set_voice_input_mode(new_mode)
 
     def on_key_up(self) -> None:
         pass
@@ -107,6 +107,6 @@ class InputModeAction(ActionBase):
     def get_config_rows(self) -> list:
         row = Adw.ActionRow(
             title="Discord Input Mode Action",
-            subtitle="Press key to toggle Discord voice input mode between Push to Talk and Voice Activity."
+            subtitle="Press key to toggle Discord voice input setting between Push to Talk and Voice Activity."
         )
         return [row]
