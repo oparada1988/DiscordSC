@@ -10,7 +10,7 @@ A native Discord integration for StreamController. This plugin communicates dire
 
 When the Discord desktop application is closed or disconnected, all plugin action keys automatically update to indicate offline status:
 
-<img src="assets/action-server-status.png" width="64" alt="Server Status Action" />
+<img src="assets/server_status_disconnected.png" width="64" alt="Disconnected State Example" />
 
 * Every action key displays a clear **`Disconnected`** label on its bottom line.
 * Channel actions (**Voice Channel** and **Text Channel**) automatically hide server name top labels while disconnected to maintain a clean visual layout.
@@ -23,35 +23,35 @@ When the Discord desktop application is closed or disconnected, all plugin actio
 ### Microphone & Audio Controls
 
 * **Mute Toggle**  
-  <img src="assets/action-mute.png" width="48" alt="Mute Action" />  
-  Toggles your microphone mute state in Discord. The key icon dynamically updates between muted and unmuted visual states.
+  <img src="assets/unmute.png" width="48" alt="Mute Action" />  
+  Toggles your microphone mute state in Discord. The key icon dynamically updates between muted (`mute.png`) and unmuted (`unmute.png`) visual states.
 
 * **Deafen Toggle**  
-  <img src="assets/action-deafen.png" width="48" alt="Deafen Action" />  
+  <img src="assets/undeafen.png" width="48" alt="Deafen Action" />  
   Toggles your deafen status in Discord. Deafening automatically mutes incoming audio as well as your microphone, mirroring native Discord client behavior.
 
 * **Push to Talk**  
-  <img src="assets/action-push-to-talk.png" width="48" alt="Push to Talk Action" />  
-  Holds your microphone unmuted while pressed. The key keeps your mic muted during idle state and switches to an active talking icon while held down.
+  <img src="assets/push_to_talk.png" width="48" alt="Push to Talk Action" />  
+  Holds your microphone unmuted while pressed. The key keeps your mic muted during idle state (`push_to_talk.png`) and switches to an active talking icon (`push_to_talk_talking.png`) while held down.
 
 * **Input Mode Toggle**  
-  <img src="assets/action-input-mode.png" width="48" alt="Input Mode Action" />  
-  Switches Discord's input mode setting between Voice Activity and Push-to-Talk mode without altering your microphone mute status.
+  <img src="assets/input_voice_activity.png" width="48" alt="Input Mode Action" />  
+  Switches Discord's input mode setting between Voice Activity (`input_voice_activity.png`) and Push-to-Talk mode (`input_push_to_talk.png`) without altering your microphone mute status.
 
 ---
 
 ### Channels & Server Controls
 
 * **Voice Channel Switcher**  
-  <img src="assets/action-voice-channel.png" width="48" alt="Voice Channel Action" />  
-  Select a server and voice channel directly from the action settings. Pressing the key connects you to the voice channel, highlights green while active, and disconnects when pressed again. Displays the server name as a top label when connected.
+  <img src="assets/voice_channel.png" width="48" alt="Voice Channel Action" />  
+  Select a server and voice channel directly from the action settings. Pressing the key connects you to the voice channel, highlights green (`voice_channel_active.png`) while active, and disconnects when pressed again. Displays the server name as a top label when connected.
 
 * **Text Channel Quick Switcher**  
-  <img src="assets/action-text-channel.png" width="48" alt="Text Channel Action" />  
+  <img src="assets/text_channel.png" width="48" alt="Text Channel Action" />  
   Select a server and text channel from settings. Pressing the key brings Discord to the foreground and opens that channel immediately. Displays the server name as a top label while online.
 
 * **Server Status**  
-  <img src="assets/action-server-status.png" width="48" alt="Server Status Action" />  
+  <img src="assets/server_status.png" width="48" alt="Server Status Action" />  
   Displays the server icon and live online member count badge for your selected Discord server. Pressing the key opens Discord directly to that server.
 
 ---
@@ -59,7 +59,7 @@ When the Discord desktop application is closed or disconnected, all plugin actio
 ### Notifications & Messaging
 
 * **Notification Hub**  
-  <img src="assets/action-notification.png" width="48" alt="Notification Action" />  
+  <img src="assets/notification.png" width="48" alt="Notification Action" />  
   Tracks unread Direct Messages and server mentions. Displays sender profile avatars along with a red notification count badge. Automatically cycles through pending notification avatars every 5 seconds. Pressing the key opens Discord directly to the unread channel or DM and clears the notification queue.
 
 ---
