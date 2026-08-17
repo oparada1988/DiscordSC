@@ -46,19 +46,13 @@ jobs:
             echo "::warning::Store access secret token is not set in GitHub repository settings. Store repository update skipped."
           fi
 
-      - name: Checkout Store Repository
+      - name: Clone Store Repository
         if: env.HAS_SECRET == 'true'
-        continue-on-error: true
-        id: checkout_store
-        uses: actions/checkout@v4
-        with:
-          repository: oparada1988/StreamController-Store
-          token: ${{ env.STORE_TOKEN }}
-          path: store
-          ref: main
+        run: |
+          git clone --depth 1 --branch main "https://x-access-token:${STORE_TOKEN}@github.com/oparada1988/StreamController-Store.git" store
 
       - name: Update Plugins.json in Store
-        if: env.HAS_SECRET == 'true' && steps.checkout_store.outcome == 'success'
+        if: env.HAS_SECRET == 'true'
         run: |
           cd store
           python3 - << 'EOF'
@@ -73,13 +67,17 @@ jobs:
           found = False
           for plugin in data:
               if 'DiscordSC' in plugin.get('url', ''):
-                  plugin['commits'] = {new_version: commit_hash}
+                  plugin['hash'] = commit_hash
+                  if 'commits' not in plugin or not isinstance(plugin['commits'], dict):
+                      plugin['commits'] = {}
+                  plugin['commits'][new_version] = commit_hash
                   found = True
                   break
 
           if not found:
               data.append({
                   "url": "https://github.com/oparada1988/DiscordSC",
+                  "hash": commit_hash,
                   "commits": {
                       new_version: commit_hash
                   }
@@ -91,14 +89,32 @@ jobs:
           EOF
 
       - name: Commit and Push Changes to Store
-        if: env.HAS_SECRET == 'true' && steps.checkout_store.outcome == 'success'
-        continue-on-error: true
+        if: env.HAS_SECRET == 'true'
         run: |
           cd store
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --unset-all http.https://github.com/.extraheader || true
           git add Plugins.json
           if ! git diff --staged --quiet; then
             git commit -m "Auto-update DiscordSC to version ${{ env.NEW_VERSION }} (commit ${{ env.COMMIT_HASH }})"
-            git push origin main
+            git -c http.extraheader= push "https://x-access-token:${STORE_TOKEN}@github.com/oparada1988/StreamController-Store.git" main
           fi
+
+      - name: Trigger Store Update (Official Store Dispatch)
+        if: env.HAS_SECRET == 'true'
+        env:
+          DISPATCH_TOKEN: ${{ secrets.STORE_AUTOMATION_TOKEN || env.STORE_TOKEN }}
+        run: |
+          curl -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $DISPATCH_TOKEN" \
+            https://api.github.com/repos/StreamController/StreamController-Store/dispatches \
+            -d "{
+              \"event_type\": \"plugin_updated\",
+              \"client_payload\": {
+                \"repo_url\": \"https://github.com/${{ github.repository }}\",
+                \"version\": \"${{ env.NEW_VERSION }}\",
+                \"commit_sha\": \"${{ env.COMMIT_HASH }}\"
+              }
+            }" || true
