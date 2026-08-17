@@ -98,6 +98,7 @@ jobs:
           git add Plugins.json
           if ! git diff --staged --quiet; then
             git commit -m "Auto-update DiscordSC to version ${{ env.NEW_VERSION }} (commit ${{ env.COMMIT_HASH }})"
+            git pull --rebase "https://x-access-token:${STORE_TOKEN}@github.com/oparada1988/StreamController-Store.git" main || true
             git -c http.extraheader= push "https://x-access-token:${STORE_TOKEN}@github.com/oparada1988/StreamController-Store.git" main
           fi
 
