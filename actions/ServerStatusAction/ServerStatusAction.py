@@ -459,3 +459,12 @@ class ServerStatusAction(ActionBase):
         settings["use_server_icon"] = switch.get_active()
         self.set_settings(settings)
         self.on_connection_change(self.plugin_base.discord_client.connected and self.plugin_base.discord_client.authenticated)
+
+    def on_remove(self) -> None:
+        self.save_persisted_state()
+
+    def on_disconnect(self) -> None:
+        pass
+
+    def on_removed_from_cache(self) -> None:
+        self.on_remove()

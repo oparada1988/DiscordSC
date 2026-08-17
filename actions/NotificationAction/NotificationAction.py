@@ -208,12 +208,21 @@ class NotificationAction(ActionBase):
         threading.Thread(target=download, daemon=True).start()
 
     def start_cycle_timer(self):
-        if self.timer_source_id is not None:
-            GLib.source_remove(self.timer_source_id)
+        self.stop_cycle_timer()
         # 5 seconds avatar cycle timer
         self.timer_source_id = GLib.timeout_add_seconds(5, self.cycle_next_avatar)
 
+    def stop_cycle_timer(self):
+        if hasattr(self, "timer_source_id") and self.timer_source_id is not None:
+            try:
+                GLib.source_remove(self.timer_source_id)
+            except Exception:
+                pass
+            self.timer_source_id = None
+
     def cycle_next_avatar(self) -> bool:
+        if not self.get_is_present():
+            return True
         with self._lock:
             if len(self.unread_notifications) > 1:
                 self.current_avatar_index = (self.current_avatar_index + 1) % len(self.unread_notifications)
@@ -355,9 +364,15 @@ class NotificationAction(ActionBase):
         )
         return [row]
 
+    def on_remove(self) -> None:
+        self.stop_cycle_timer()
+        self.save_persisted_state()
+
+    def on_disconnect(self) -> None:
+        self.stop_cycle_timer()
+
+    def on_removed_from_cache(self) -> None:
+        self.on_remove()
+
     def __del__(self):
-        if hasattr(self, "timer_source_id") and self.timer_source_id is not None:
-            try:
-                GLib.source_remove(self.timer_source_id)
-            except Exception:
-                pass
+        self.stop_cycle_timer()
