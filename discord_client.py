@@ -855,24 +855,15 @@ class DiscordIPCClient:
     def play_soundboard_sound(
         self,
         sound_id: str,
+        channel_id: Optional[str] = None,
         source_guild_id: Optional[str] = None,
         callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     ):
         """Play a soundboard sound in the current voice channel (experimental RPC support)."""
         args = {"sound_id": sound_id}
+        if channel_id:
+            args["channel_id"] = channel_id
         if source_guild_id:
             args["source_guild_id"] = source_guild_id
-
-        def on_play_response(payload: Dict[str, Any]):
-            # Some Discord builds may expose this as SEND_SOUNDBOARD_SOUND instead.
-            if payload.get("evt") == "ERROR":
-                logger.warning(
-                    "PLAY_SOUNDBOARD_SOUND failed, trying SEND_SOUNDBOARD_SOUND fallback."
-                )
-                self.send_command("SEND_SOUNDBOARD_SOUND", args=args, callback=callback)
-                return
-
-            if callback:
-                callback(payload)
-
-        self.send_command("PLAY_SOUNDBOARD_SOUND", args=args, callback=on_play_response)
+            args["guild_id"] = source_guild_id
+        self.send_command("PLAY_SOUNDBOARD_SOUND", args=args, callback=callback)
