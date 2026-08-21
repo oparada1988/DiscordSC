@@ -762,3 +762,22 @@ class DiscordIPCClient:
             "guild_id": guild_id
         }
         self.send_command("GET_GUILD", args=args, callback=callback)
+
+    def get_soundboard_sounds(self, guild_id: str, callback: Callable[[Dict[str, Any]], None]):
+        """Get available soundboard sounds for a guild"""
+        args = {
+            "guild_id": guild_id
+        }
+        self.send_command("GET_SOUNDBOARD_SOUNDS", args=args, callback=callback)
+
+    def play_soundboard_sound(self, sound_id: str, channel_id: Optional[str] = None, source_guild_id: Optional[str] = None, callback: Optional[Callable[[Dict[str, Any]], None]] = None):
+        """Play a soundboard sound in the current voice channel"""
+        args = {
+            "sound_id": sound_id
+        }
+        if channel_id:
+            args["channel_id"] = channel_id
+        if source_guild_id:
+            args["source_guild_id"] = source_guild_id
+            args["guild_id"] = source_guild_id
+        self.send_command("PLAY_SOUNDBOARD_SOUND", args=args, callback=callback)

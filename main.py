@@ -25,6 +25,7 @@ from .actions.PushToTalkAction.PushToTalkAction import PushToTalkAction
 from .actions.NotificationAction.NotificationAction import NotificationAction
 from .actions.ServerStatusAction.ServerStatusAction import ServerStatusAction
 from .actions.InputModeAction.InputModeAction import InputModeAction
+from .actions.SoundboardAction.SoundboardAction import SoundboardAction
 
 class PluginTemplate(PluginBase):
     def __init__(self):
@@ -165,6 +166,20 @@ class PluginTemplate(PluginBase):
             }
         )
         self.add_action_holder(self.input_mode_action_holder)
+
+        self.soundboard_action_holder = ActionHolder(
+            plugin_base=self,
+            action_base=SoundboardAction,
+            action_id="com_oparada_DiscordSC::SoundboardAction",
+            action_name="Soundboard Sound",
+            icon=Gtk.Image(file=os.path.join(self.PATH, "assets", "action-soundboard.png")),
+            action_support={
+                Input.Key: ActionInputSupport.SUPPORTED,
+                Input.Dial: ActionInputSupport.UNTESTED,
+                Input.Touchscreen: ActionInputSupport.UNTESTED
+            }
+        )
+        self.add_action_holder(self.soundboard_action_holder)
 
         # Load manifest version dynamically
         plugin_ver = "1.0.0"

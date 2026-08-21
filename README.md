@@ -38,6 +38,10 @@ When the Discord desktop application is closed or disconnected, all plugin actio
   <img src="assets/input_voice_activity.png" width="48" alt="Input Mode Action" />  
   Switches Discord's input mode setting between Voice Activity (`input_voice_activity.png`) and Push-to-Talk mode (`input_push_to_talk.png`) without altering your microphone mute status.
 
+* **Soundboard Sound**  
+  <img src="assets/soundboard.png" width="48" alt="Soundboard Action" />  
+  Select a server and a Discord soundboard sound from action settings, then press the key to play it in your currently connected voice channel. If your Discord RPC build does not expose soundboard commands, the action will show an unsupported status.
+
 ---
 
 ### Channels & Server Controls
