@@ -8,7 +8,6 @@ from src.backend.PluginManager.PluginBase import PluginBase
 import os
 import threading
 import time
-import urllib.parse
 import urllib.request
 from loguru import logger
 import gi
@@ -32,29 +31,19 @@ class SoundboardAction(ActionBase):
         self._metadata_hydrating = False
 
     def on_ready(self) -> None:
-        # Ensure we have image and label control so our icon and label are displayed by default.
+        # Ensure we have image and label control so our icon and label are displayed by default
         try:
             state = self.get_state()
             if state is not None:
                 apm = state.action_permission_manager
                 own_index = self.get_own_action_index()
                 if own_index is not None and own_index != -1:
-                    if (
-                        apm.get_image_control_index() is None
-                        or not self.get_is_multi_action()
-                    ):
+                    if apm.get_image_control_index() is None or not self.get_is_multi_action():
                         if apm.get_image_control_index() != own_index:
-                            apm.set_image_control_index(
-                                own_index, reload_pages=False, reload_self=False
-                            )
-                    if (
-                        apm.get_label_control_index(2) is None
-                        or not self.get_is_multi_action()
-                    ):
+                            apm.set_image_control_index(own_index, reload_pages=False, reload_self=False)
+                    if apm.get_label_control_index(2) is None or not self.get_is_multi_action():
                         if apm.get_label_control_index(2) != own_index:
-                            apm.set_label_control_index(
-                                2, own_index, reload_pages=False, reload_self=False
-                            )
+                            apm.set_label_control_index(2, own_index, reload_pages=False, reload_self=False)
         except Exception as e:
             logger.error(f"SoundboardAction: Error setting image/label control: {e}")
 
@@ -64,9 +53,7 @@ class SoundboardAction(ActionBase):
 
     def on_connection_change(self, is_connected: bool):
         if not is_connected:
-            media_path = os.path.join(
-                self.plugin_base.PATH, "assets", "soundboard_disconnected.png"
-            )
+            media_path = os.path.join(self.plugin_base.PATH, "assets", "soundboard_disconnected.png")
             if os.path.exists(media_path):
                 GLib.idle_add(lambda: self.set_media(media_path=media_path, size=1.0))
             self.set_top_label("")
@@ -104,22 +91,17 @@ class SoundboardAction(ActionBase):
                         sound_name = name
                         break
 
-            if (server_name and server_name != settings.get("guild_name")) or (
-                sound_name and sound_name != settings.get("sound_name")
-            ):
+            if (server_name and server_name != settings.get("guild_name")) or (sound_name and sound_name != settings.get("sound_name")):
                 settings["guild_name"] = server_name
                 settings["sound_name"] = sound_name
                 self.set_settings(settings)
 
-            if (
-                not self.plugin_base.discord_client.connected
-                or not self.plugin_base.discord_client.authenticated
-            ):
+            if not self.plugin_base.discord_client.connected or not self.plugin_base.discord_client.authenticated:
                 self.set_top_label("")
                 self.set_bottom_label("Disconnected", font_size=12)
                 return
 
-            # Keep the visual focus on the sound itself rather than the selected server.
+            # Keep visual focus on the sound itself rather than the selected server
             self.set_top_label("")
             self.set_bottom_label(sound_name)
 
@@ -136,9 +118,7 @@ class SoundboardAction(ActionBase):
         codepoint_path = "-".join(codepoints)
         return f"https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/{codepoint_path}.png"
 
-    def get_or_fetch_sound_icon(
-        self, sound_id: str, emoji_id: str = "", emoji_name: str = ""
-    ):
+    def get_or_fetch_sound_icon(self, sound_id: str, emoji_id: str = "", emoji_name: str = ""):
         if not sound_id:
             return None
 
@@ -151,9 +131,7 @@ class SoundboardAction(ActionBase):
         if not icon_url:
             return None
 
-        cache_dir = os.path.join(
-            self.plugin_base.PATH, "assets", "cache", "soundboard_icons"
-        )
+        cache_dir = os.path.join(self.plugin_base.PATH, "assets", "cache", "soundboard_icons")
         os.makedirs(cache_dir, exist_ok=True)
         cached_file = os.path.join(cache_dir, f"{sound_id}.png")
 
@@ -168,21 +146,15 @@ class SoundboardAction(ActionBase):
 
             def download():
                 try:
-                    req = urllib.request.Request(
-                        icon_url, headers={"User-Agent": "Mozilla/5.0"}
-                    )
+                    req = urllib.request.Request(icon_url, headers={"User-Agent": "Mozilla/5.0"})
                     with urllib.request.urlopen(req, timeout=5) as resp:
                         data = resp.read()
                         with open(cached_file, "wb") as f:
                             f.write(data)
-                    logger.info(
-                        f"SoundboardAction: Downloaded icon for sound {sound_id}"
-                    )
+                    logger.info(f"SoundboardAction: Downloaded icon for sound {sound_id}")
                     GLib.idle_add(self.update_sound_icon)
                 except Exception as e:
-                    logger.error(
-                        f"SoundboardAction: Failed to download icon for sound {sound_id}: {e}"
-                    )
+                    logger.error(f"SoundboardAction: Failed to download icon for sound {sound_id}: {e}")
                 finally:
                     self._fetching_sound_icons.discard(sound_id)
 
@@ -194,13 +166,8 @@ class SoundboardAction(ActionBase):
         settings = self.get_settings() or {}
         sound_id = settings.get("sound_id", "").strip()
 
-        if (
-            not self.plugin_base.discord_client.connected
-            or not self.plugin_base.discord_client.authenticated
-        ):
-            media_path = os.path.join(
-                self.plugin_base.PATH, "assets", "soundboard_disconnected.png"
-            )
+        if not self.plugin_base.discord_client.connected or not self.plugin_base.discord_client.authenticated:
+            media_path = os.path.join(self.plugin_base.PATH, "assets", "soundboard_disconnected.png")
             if os.path.exists(media_path):
                 GLib.idle_add(lambda: self.set_media(media_path=media_path, size=1.0))
             return
@@ -211,25 +178,26 @@ class SoundboardAction(ActionBase):
         emoji_id = sound_meta.get("emoji_id")
         emoji_name = sound_meta.get("emoji_name") or ""
         if emoji_id or emoji_name:
-            icon_path = self.get_or_fetch_sound_icon(
-                sound_id,
-                str(emoji_id) if emoji_id else "",
-                str(emoji_name),
-            )
+            icon_path = self.get_or_fetch_sound_icon(sound_id, str(emoji_id) if emoji_id else "", str(emoji_name))
             if icon_path and os.path.exists(icon_path):
                 media_path = icon_path
 
         if os.path.exists(media_path):
             GLib.idle_add(lambda: self.set_media(media_path=media_path, size=1.0))
 
+    def _extract_sounds_array(self, payload: dict):
+        data = payload.get("data", {})
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            return data.get("sounds") or data.get("soundboard_sounds") or data.get("items") or []
+        return []
+
     def hydrate_selected_sound_metadata(self):
         if self._metadata_hydrating:
             return
 
-        if (
-            not self.plugin_base.discord_client.connected
-            or not self.plugin_base.discord_client.authenticated
-        ):
+        if not self.plugin_base.discord_client.connected or not self.plugin_base.discord_client.authenticated:
             return
 
         settings = self.get_settings() or {}
@@ -250,43 +218,26 @@ class SoundboardAction(ActionBase):
             def apply_metadata():
                 try:
                     if payload.get("evt") == "ERROR":
-                        logger.warning(
-                            f"SoundboardAction: Metadata hydration failed: {payload.get('data', {})}"
-                        )
+                        logger.warning(f"SoundboardAction: Metadata hydration failed: {payload.get('data', {})}")
                         return
 
-                    data = payload.get("data", {})
-                    if isinstance(data, list):
-                        sounds = data
-                    elif isinstance(data, dict):
-                        sounds = (
-                            data.get("sounds")
-                            or data.get("soundboard_sounds")
-                            or data.get("items")
-                            or []
-                        )
-                    else:
-                        sounds = []
+                    sounds = self._extract_sounds_array(payload)
 
                     loaded = []
                     for sound in sounds:
                         if not isinstance(sound, dict):
                             continue
                         sid = sound.get("sound_id") or sound.get("id")
-                        sname = (
-                            sound.get("name") or sound.get("sound") or "Unnamed Sound"
-                        )
+                        sname = sound.get("name") or sound.get("sound") or "Unnamed Sound"
                         if not sid:
                             continue
                         sid_str = str(sid)
                         self.sounds_meta[sid_str] = sound
                         loaded.append((sid_str, sname))
 
-                    # Populate names for configured actions even when config UI was never opened.
+                    # Populate names for configured actions even when config UI was never opened
                     if loaded:
-                        self.sounds_map = [("", "Select a Sound...")] + sorted(
-                            loaded, key=lambda s: s[1].lower()
-                        )
+                        self.sounds_map = [("", "Select a Sound...")] + sorted(loaded, key=lambda s: s[1].lower())
 
                     self.update_labels()
                     self.update_sound_icon()
@@ -295,16 +246,12 @@ class SoundboardAction(ActionBase):
 
             GLib.idle_add(apply_metadata)
 
-        self.plugin_base.discord_client.get_soundboard_sounds(
-            guild_id, on_sounds_received
-        )
+        self.plugin_base.discord_client.get_soundboard_sounds(guild_id, on_sounds_received)
 
     def on_key_down(self) -> None:
         client = self.plugin_base.discord_client
         if not client.connected or not client.authenticated:
-            logger.warning(
-                "SoundboardAction: Discord client not connected or authenticated."
-            )
+            logger.warning("SoundboardAction: Discord client not connected or authenticated.")
             return
 
         settings = self.get_settings() or {}
@@ -323,9 +270,7 @@ class SoundboardAction(ActionBase):
         def on_voice_channel(payload: dict):
             channel_data = payload.get("data")
             if not isinstance(channel_data, dict) or not channel_data.get("id"):
-                logger.warning(
-                    "SoundboardAction: You must be connected to a voice channel to play a sound."
-                )
+                logger.warning("SoundboardAction: You must be connected to a voice channel to play a sound.")
                 self.set_bottom_label("Join Voice First", font_size=11)
 
                 # Keep icon/metadata in sync even when playback is blocked by voice state.
@@ -340,14 +285,9 @@ class SoundboardAction(ActionBase):
                     err = play_payload.get("data", {})
                     code = err.get("code")
                     message = err.get("message", "Unknown error")
-                    logger.error(
-                        f"SoundboardAction: Failed to play soundboard sound (code={code}): {message}"
-                    )
+                    logger.error(f"SoundboardAction: Failed to play soundboard sound (code={code}): {message}")
 
-                    if (
-                        "unknown" in str(message).lower()
-                        and "command" in str(message).lower()
-                    ):
+                    if "unknown" in str(message).lower() and "command" in str(message).lower():
                         self.rpc_supported = False
                         self.set_bottom_label("RPC Unsupported", font_size=11)
                     else:
@@ -361,41 +301,23 @@ class SoundboardAction(ActionBase):
             # If metadata is not loaded yet (cold start before config UI opens),
             # request sounds once and then retry playback so guild sounds can include source_guild_id.
             if configured_guild_id and sound_id not in self.sounds_meta:
-
                 def on_hydrate_then_play(payload_sounds: dict):
-                    data = payload_sounds.get("data", {})
-                    if isinstance(data, list):
-                        sounds = data
-                    elif isinstance(data, dict):
-                        sounds = (
-                            data.get("sounds")
-                            or data.get("soundboard_sounds")
-                            or data.get("items")
-                            or []
-                        )
-                    else:
-                        sounds = []
+                    sounds = self._extract_sounds_array(payload_sounds)
 
                     for sound in sounds:
                         if not isinstance(sound, dict):
                             continue
                         sid = sound.get("sound_id") or sound.get("id")
-                        sname = (
-                            sound.get("name") or sound.get("sound") or "Unnamed Sound"
-                        )
+                        sname = sound.get("name") or sound.get("sound") or "Unnamed Sound"
                         if not sid:
                             continue
                         sid_str = str(sid)
                         self.sounds_meta[sid_str] = sound
-                        if not any(
-                            existing_id == sid_str for existing_id, _ in self.sounds_map
-                        ):
+                        if not any(existing_id == sid_str for existing_id, _ in self.sounds_map):
                             self.sounds_map.append((sid_str, sname))
 
                     sound_meta_retry = self.sounds_meta.get(sound_id, {})
-                    source_guild_id_retry = str(
-                        sound_meta_retry.get("guild_id") or ""
-                    ).strip()
+                    source_guild_id_retry = str(sound_meta_retry.get("guild_id") or "").strip()
 
                     client.play_soundboard_sound(
                         sound_id=sound_id,
@@ -431,6 +353,7 @@ class SoundboardAction(ActionBase):
 
         self.load_guilds()
 
+        # Clean up references on widget destroy to prevent stale UI references
         def on_destroy(widget):
             self.guild_selector = None
             self.sound_selector = None
@@ -506,12 +429,8 @@ class SoundboardAction(ActionBase):
                 try:
                     data = payload.get("data", {})
                     guilds = data.get("guilds", [])
-                    guilds_sorted = sorted(
-                        guilds, key=lambda g: g.get("name", "").lower()
-                    )
-                    self.guilds_map = [("", "Select a Server...")] + [
-                        (g.get("id"), g.get("name")) for g in guilds_sorted
-                    ]
+                    guilds_sorted = sorted(guilds, key=lambda g: g.get("name", "").lower())
+                    self.guilds_map = [("", "Select a Server...")] + [(g.get("id"), g.get("name")) for g in guilds_sorted]
 
                     self.guild_model = Gtk.StringList()
                     for _, name in self.guilds_map:
@@ -558,10 +477,7 @@ class SoundboardAction(ActionBase):
         if not client.connected or not client.authenticated:
             return
 
-        if (
-            self.sounds_map
-            and getattr(self, "cached_sounds_guild_id", None) == guild_id
-        ):
+        if self.sounds_map and getattr(self, "cached_sounds_guild_id", None) == guild_id:
             self._loading_sounds = True
             try:
                 self.sound_model = Gtk.StringList()
@@ -606,9 +522,7 @@ class SoundboardAction(ActionBase):
                 try:
                     data = payload.get("data", {})
                     if payload.get("evt") == "ERROR":
-                        logger.warning(
-                            f"SoundboardAction: Discord RPC does not expose soundboard list: {data}"
-                        )
+                        logger.warning(f"SoundboardAction: Discord RPC does not expose soundboard list: {data}")
                         self.rpc_supported = False
                         self.sounds_map = [("", "Soundboard RPC unsupported")]
                         self.sound_model = Gtk.StringList()
@@ -618,14 +532,8 @@ class SoundboardAction(ActionBase):
                         self.sound_selector.set_sensitive(False)
                         return
 
-                    if (
-                        isinstance(data, dict)
-                        and data.get("code")
-                        and data.get("message")
-                    ):
-                        logger.warning(
-                            f"SoundboardAction: GET_SOUNDBOARD_SOUNDS returned error-like payload: {data}"
-                        )
+                    if isinstance(data, dict) and data.get("code") and data.get("message"):
+                        logger.warning(f"SoundboardAction: GET_SOUNDBOARD_SOUNDS returned error-like payload: {data}")
                         self.sounds_map = [("", "Soundboard unavailable")]
                         self.sound_model = Gtk.StringList()
                         self.sound_model.append("Soundboard unavailable")
@@ -634,21 +542,9 @@ class SoundboardAction(ActionBase):
                         self.sound_selector.set_sensitive(False)
                         return
 
-                    logger.debug(
-                        f"SoundboardAction: GET_SOUNDBOARD_SOUNDS payload type={type(data).__name__}"
-                    )
+                    logger.debug(f"SoundboardAction: GET_SOUNDBOARD_SOUNDS payload type={type(data).__name__}")
 
-                    if isinstance(data, list):
-                        sounds = data
-                    elif isinstance(data, dict):
-                        sounds = (
-                            data.get("sounds")
-                            or data.get("soundboard_sounds")
-                            or data.get("items")
-                            or []
-                        )
-                    else:
-                        sounds = []
+                    sounds = self._extract_sounds_array(payload)
 
                     self.sounds_meta = {}
                     parsed_sounds = []
@@ -656,9 +552,7 @@ class SoundboardAction(ActionBase):
                         if not isinstance(sound, dict):
                             continue
                         sound_id = sound.get("sound_id") or sound.get("id")
-                        sound_name = (
-                            sound.get("name") or sound.get("sound") or "Unnamed Sound"
-                        )
+                        sound_name = sound.get("name") or sound.get("sound") or "Unnamed Sound"
                         if sound_id:
                             sound_id_str = str(sound_id)
                             parsed_sounds.append((sound_id_str, sound_name))
@@ -699,9 +593,7 @@ class SoundboardAction(ActionBase):
             if not getattr(self, "_loading_sounds", False):
                 return False
 
-            logger.warning(
-                "SoundboardAction: Timed out waiting for GET_SOUNDBOARD_SOUNDS callback response."
-            )
+            logger.warning("SoundboardAction: Timed out waiting for GET_SOUNDBOARD_SOUNDS callback response.")
             self._loading_sounds = False
 
             if hasattr(self, "sound_selector") and self.sound_selector is not None:

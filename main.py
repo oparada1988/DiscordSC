@@ -11,7 +11,6 @@ import gi
 from loguru import logger
 import threading
 from typing import Optional
-
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Gtk, Adw, GLib
@@ -28,7 +27,6 @@ from .actions.ServerStatusAction.ServerStatusAction import ServerStatusAction
 from .actions.InputModeAction.InputModeAction import InputModeAction
 from .actions.SoundboardAction.SoundboardAction import SoundboardAction
 
-
 class PluginTemplate(PluginBase):
     def __init__(self):
         super().__init__()
@@ -43,14 +41,16 @@ class PluginTemplate(PluginBase):
 
         # Initialize Discord Client
         self.discord_client = DiscordIPCClient(
-            client_id=client_id, client_secret=client_secret, redirect_uri=redirect_uri
+            client_id=client_id,
+            client_secret=client_secret,
+            redirect_uri=redirect_uri
         )
         if access_token:
             self.discord_client.access_token = access_token
         if refresh_token:
             self.discord_client.refresh_token = refresh_token
         self.discord_client.on_token_refreshed = self.save_tokens
-
+            
         # Start background client loop
         self.discord_client.start()
 
@@ -64,8 +64,8 @@ class PluginTemplate(PluginBase):
             action_support={
                 Input.Key: ActionInputSupport.SUPPORTED,
                 Input.Dial: ActionInputSupport.UNTESTED,
-                Input.Touchscreen: ActionInputSupport.UNTESTED,
-            },
+                Input.Touchscreen: ActionInputSupport.UNTESTED
+            }
         )
         self.add_action_holder(self.mute_action_holder)
 
@@ -78,8 +78,8 @@ class PluginTemplate(PluginBase):
             action_support={
                 Input.Key: ActionInputSupport.SUPPORTED,
                 Input.Dial: ActionInputSupport.UNTESTED,
-                Input.Touchscreen: ActionInputSupport.UNTESTED,
-            },
+                Input.Touchscreen: ActionInputSupport.UNTESTED
+            }
         )
         self.add_action_holder(self.deafen_action_holder)
 
@@ -88,14 +88,12 @@ class PluginTemplate(PluginBase):
             action_base=TextChannelAction,
             action_id="com_oparada_DiscordSC::TextChannelAction",
             action_name="Text Channel Switch",
-            icon=Gtk.Image(
-                file=os.path.join(self.PATH, "assets", "action-text-channel.png")
-            ),
+            icon=Gtk.Image(file=os.path.join(self.PATH, "assets", "action-text-channel.png")),
             action_support={
                 Input.Key: ActionInputSupport.SUPPORTED,
                 Input.Dial: ActionInputSupport.UNTESTED,
-                Input.Touchscreen: ActionInputSupport.UNTESTED,
-            },
+                Input.Touchscreen: ActionInputSupport.UNTESTED
+            }
         )
         self.add_action_holder(self.text_channel_action_holder)
 
@@ -104,14 +102,12 @@ class PluginTemplate(PluginBase):
             action_base=VoiceChannelAction,
             action_id="com_oparada_DiscordSC::VoiceChannelAction",
             action_name="Voice Channel Switch",
-            icon=Gtk.Image(
-                file=os.path.join(self.PATH, "assets", "action-voice-channel.png")
-            ),
+            icon=Gtk.Image(file=os.path.join(self.PATH, "assets", "action-voice-channel.png")),
             action_support={
                 Input.Key: ActionInputSupport.SUPPORTED,
                 Input.Dial: ActionInputSupport.UNTESTED,
-                Input.Touchscreen: ActionInputSupport.UNTESTED,
-            },
+                Input.Touchscreen: ActionInputSupport.UNTESTED
+            }
         )
         self.add_action_holder(self.voice_channel_action_holder)
 
@@ -120,14 +116,12 @@ class PluginTemplate(PluginBase):
             action_base=PushToTalkAction,
             action_id="com_oparada_DiscordSC::PushToTalkAction",
             action_name="Push to Talk",
-            icon=Gtk.Image(
-                file=os.path.join(self.PATH, "assets", "action-push-to-talk.png")
-            ),
+            icon=Gtk.Image(file=os.path.join(self.PATH, "assets", "action-push-to-talk.png")),
             action_support={
                 Input.Key: ActionInputSupport.SUPPORTED,
                 Input.Dial: ActionInputSupport.UNTESTED,
-                Input.Touchscreen: ActionInputSupport.UNTESTED,
-            },
+                Input.Touchscreen: ActionInputSupport.UNTESTED
+            }
         )
         self.add_action_holder(self.push_to_talk_action_holder)
 
@@ -136,14 +130,12 @@ class PluginTemplate(PluginBase):
             action_base=NotificationAction,
             action_id="com_oparada_DiscordSC::NotificationAction",
             action_name="Discord Notifications",
-            icon=Gtk.Image(
-                file=os.path.join(self.PATH, "assets", "action-notification.png")
-            ),
+            icon=Gtk.Image(file=os.path.join(self.PATH, "assets", "action-notification.png")),
             action_support={
                 Input.Key: ActionInputSupport.SUPPORTED,
                 Input.Dial: ActionInputSupport.UNTESTED,
-                Input.Touchscreen: ActionInputSupport.UNTESTED,
-            },
+                Input.Touchscreen: ActionInputSupport.UNTESTED
+            }
         )
         self.add_action_holder(self.notification_action_holder)
 
@@ -152,14 +144,12 @@ class PluginTemplate(PluginBase):
             action_base=ServerStatusAction,
             action_id="com_oparada_DiscordSC::ServerStatusAction",
             action_name="Server Status",
-            icon=Gtk.Image(
-                file=os.path.join(self.PATH, "assets", "action-server-status.png")
-            ),
+            icon=Gtk.Image(file=os.path.join(self.PATH, "assets", "action-server-status.png")),
             action_support={
                 Input.Key: ActionInputSupport.SUPPORTED,
                 Input.Dial: ActionInputSupport.UNTESTED,
-                Input.Touchscreen: ActionInputSupport.UNTESTED,
-            },
+                Input.Touchscreen: ActionInputSupport.UNTESTED
+            }
         )
         self.add_action_holder(self.server_status_action_holder)
 
@@ -168,14 +158,12 @@ class PluginTemplate(PluginBase):
             action_base=InputModeAction,
             action_id="com_oparada_DiscordSC::InputModeAction",
             action_name="Discord Input Mode",
-            icon=Gtk.Image(
-                file=os.path.join(self.PATH, "assets", "action-input-mode.png")
-            ),
+            icon=Gtk.Image(file=os.path.join(self.PATH, "assets", "action-input-mode.png")),
             action_support={
                 Input.Key: ActionInputSupport.SUPPORTED,
                 Input.Dial: ActionInputSupport.UNTESTED,
-                Input.Touchscreen: ActionInputSupport.UNTESTED,
-            },
+                Input.Touchscreen: ActionInputSupport.UNTESTED
+            }
         )
         self.add_action_holder(self.input_mode_action_holder)
 
@@ -184,14 +172,12 @@ class PluginTemplate(PluginBase):
             action_base=SoundboardAction,
             action_id="com_oparada_DiscordSC::SoundboardAction",
             action_name="Soundboard Sound",
-            icon=Gtk.Image(
-                file=os.path.join(self.PATH, "assets", "action-soundboard.png")
-            ),
+            icon=Gtk.Image(file=os.path.join(self.PATH, "assets", "action-soundboard.png")),
             action_support={
                 Input.Key: ActionInputSupport.SUPPORTED,
                 Input.Dial: ActionInputSupport.UNTESTED,
-                Input.Touchscreen: ActionInputSupport.UNTESTED,
-            },
+                Input.Touchscreen: ActionInputSupport.UNTESTED
+            }
         )
         self.add_action_holder(self.soundboard_action_holder)
 
@@ -211,7 +197,7 @@ class PluginTemplate(PluginBase):
             plugin_name="DiscordSC",
             github_repo="https://github.com/oparada1988/DiscordSC",
             plugin_version=plugin_ver,
-            app_version="1.1.1-alpha",
+            app_version="1.1.1-alpha"
         )
 
     def show_dialog(self, title: str, text: str):
@@ -224,7 +210,7 @@ class PluginTemplate(PluginBase):
                     windows = app.get_windows()
                     if windows:
                         parent_window = windows[0]
-
+                        
             dialog = Gtk.MessageDialog(
                 transient_for=parent_window,
                 modal=True,
@@ -235,7 +221,6 @@ class PluginTemplate(PluginBase):
             dialog.set_secondary_text(text)
             dialog.connect("response", lambda d, r: d.destroy())
             dialog.present()
-
         GLib.idle_add(run_dialog)
 
     def get_settings_area(self):
@@ -246,11 +231,11 @@ class PluginTemplate(PluginBase):
         # 1. Client ID entry row
         client_id_row = Adw.EntryRow(title="Client ID")
         client_id_row.set_text(settings.get("client_id", ""))
-
+        
         # 2. Client Secret entry row
         client_secret_row = Adw.EntryRow(title="Client Secret")
         client_secret_row.set_text(settings.get("client_secret", ""))
-
+        
         # 3. Redirect URI entry row
         redirect_uri_row = Adw.EntryRow(title="Redirect URI")
         redirect_uri_row.set_text(settings.get("redirect_uri", "http://localhost:9000"))
@@ -262,9 +247,10 @@ class PluginTemplate(PluginBase):
         # 4. Save settings action row
         save_button = Gtk.Button(label="Save")
         save_button.set_valign(Gtk.Align.CENTER)
-
+        
         save_row = Adw.ActionRow(
-            title="Save Credentials", subtitle="Apply client credentials and reconnect"
+            title="Save Credentials",
+            subtitle="Apply client credentials and reconnect"
         )
         save_row.add_suffix(save_button)
         group.add(save_row)
@@ -272,15 +258,15 @@ class PluginTemplate(PluginBase):
         # 5. Authorize action row
         auth_button = Gtk.Button(label="Authorize")
         auth_button.set_valign(Gtk.Align.CENTER)
-
+        
         # Check current token status
         if settings.get("access_token"):
             auth_button.set_label("Re-Authorize")
             auth_button.add_css_class("suggested-action")
-
+            
         auth_row = Adw.ActionRow(
             title="Authorize with Discord",
-            subtitle="Request access to control mute and deafen state",
+            subtitle="Request access to control mute and deafen state"
         )
         auth_row.add_suffix(auth_button)
         group.add(auth_row)
@@ -289,23 +275,21 @@ class PluginTemplate(PluginBase):
             c_id = client_id_row.get_text().strip()
             c_secret = client_secret_row.get_text().strip()
             r_uri = redirect_uri_row.get_text().strip()
-
+            
             s = self.get_settings()
-            changed = (
-                s.get("client_id") != c_id
-                or s.get("client_secret") != c_secret
-                or s.get("redirect_uri") != r_uri
-            )
-
+            changed = (s.get("client_id") != c_id or 
+                       s.get("client_secret") != c_secret or 
+                       s.get("redirect_uri") != r_uri)
+            
             s["client_id"] = c_id
             s["client_secret"] = c_secret
             s["redirect_uri"] = r_uri
             self.set_settings(s)
-
+            
             self.discord_client.client_id = c_id
             self.discord_client.client_secret = c_secret
             self.discord_client.redirect_uri = r_uri
-
+            
             if changed:
                 logger.info("Credentials changed, reconnecting Discord client...")
                 self.discord_client._disconnect()
@@ -313,30 +297,21 @@ class PluginTemplate(PluginBase):
 
         def on_save_clicked(btn):
             save_credentials_ui()
-            self.show_dialog(
-                "Settings Saved",
-                "Credentials saved and client reconnected (if changed)!",
-            )
+            self.show_dialog("Settings Saved", "Credentials saved and client reconnected (if changed)!")
 
         def on_authorize_clicked(btn):
             save_credentials_ui()
-
+            
             s = self.get_settings()
             c_id = s.get("client_id", "").strip()
             c_secret = s.get("client_secret", "").strip()
-
+            
             if not c_id or not c_secret:
-                self.show_dialog(
-                    "Credentials Required",
-                    "Please enter your Client ID and Client Secret first.",
-                )
+                self.show_dialog("Credentials Required", "Please enter your Client ID and Client Secret first.")
                 return
-
+                
             if not self.discord_client.connected:
-                self.show_dialog(
-                    "Discord Disconnected",
-                    "Please make sure Discord is open and running on your system, and give it a few seconds to connect.",
-                )
+                self.show_dialog("Discord Disconnected", "Please make sure Discord is open and running on your system, and give it a few seconds to connect.")
                 return
 
             btn.set_sensitive(False)
@@ -344,32 +319,26 @@ class PluginTemplate(PluginBase):
 
             def auth_callback(code):
                 if not code:
-                    self.show_dialog(
-                        "Authorization Failed",
-                        "Did not receive authorization code from Discord. Make sure the Client ID is correct.",
-                    )
+                    self.show_dialog("Authorization Failed", "Did not receive authorization code from Discord. Make sure the Client ID is correct.")
                     GLib.idle_add(btn.set_sensitive, True)
                     GLib.idle_add(btn.set_label, "Authorize")
                     return
-
+                
                 # Code received, perform token exchange
                 def token_callback(token, refresh_token):
                     if not token:
-                        self.show_dialog(
-                            "Token Exchange Failed",
-                            "Failed to retrieve access token. Check Client Secret and Redirect URI settings.",
-                        )
+                        self.show_dialog("Token Exchange Failed", "Failed to retrieve access token. Check Client Secret and Redirect URI settings.")
                         GLib.idle_add(btn.set_sensitive, True)
                         GLib.idle_add(btn.set_label, "Authorize")
                         return
-
+                    
                     # Store access token and refresh token
                     new_settings = self.get_settings()
                     new_settings["access_token"] = token
                     if refresh_token:
                         new_settings["refresh_token"] = refresh_token
                     self.set_settings(new_settings)
-
+                    
                     self.discord_client.access_token = token
                     if refresh_token:
                         self.discord_client.refresh_token = refresh_token
@@ -377,20 +346,15 @@ class PluginTemplate(PluginBase):
                     # Authenticate client
                     def auth_done(success):
                         if success:
-                            self.show_dialog(
-                                "Success", "Discord plugin successfully authorized!"
-                            )
+                            self.show_dialog("Success", "Discord plugin successfully authorized!")
                             GLib.idle_add(btn.set_sensitive, True)
                             GLib.idle_add(btn.set_label, "Re-Authorize")
                             GLib.idle_add(btn.add_css_class, "suggested-action")
                         else:
-                            self.show_dialog(
-                                "Authentication Failed",
-                                "Failed to authenticate session with retrieved access token.",
-                            )
+                            self.show_dialog("Authentication Failed", "Failed to authenticate session with retrieved access token.")
                             GLib.idle_add(btn.set_sensitive, True)
                             GLib.idle_add(btn.set_label, "Authorize")
-
+                            
                     self.discord_client.authenticate(token, auth_done)
 
                 self.discord_client.token_exchange(code, token_callback)
@@ -404,17 +368,13 @@ class PluginTemplate(PluginBase):
 
     def save_tokens(self, access_token: str, refresh_token: Optional[str] = None):
         """Save refreshed access token and refresh token to settings"""
-
         def run_save():
-            logger.info(
-                "Saving newly refreshed Discord access and refresh tokens to settings..."
-            )
+            logger.info("Saving newly refreshed Discord access and refresh tokens to settings...")
             s = self.get_settings()
             s["access_token"] = access_token
             if refresh_token:
                 s["refresh_token"] = refresh_token
             self.set_settings(s)
-
         GLib.idle_add(run_save)
 
     def on_close(self):
