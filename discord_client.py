@@ -12,6 +12,7 @@ import weakref
 from loguru import logger
 from typing import Callable, Dict, List, Any, Optional
 
+
 class SubprocessSocketWrapper:
     def __init__(self, process: subprocess.Popen):
         self.process = process
@@ -40,6 +41,7 @@ class SubprocessSocketWrapper:
             self.process.wait(timeout=0.5)
         except Exception:
             pass
+
 
 class SafeCallback:
     def __init__(self, cb):
@@ -74,41 +76,49 @@ class SafeCallback:
 
 
 class DiscordIPCClient:
-    def __init__(self, client_id: str = "", client_secret: str = "", redirect_uri: str = "http://localhost:9000"):
+    def __init__(
+        self,
+        client_id: str = "",
+        client_secret: str = "",
+        redirect_uri: str = "http://localhost:9000",
+    ):
         self.client_id = client_id
         self.client_secret = client_secret
         self.redirect_uri = redirect_uri
-        
+
         self.sock: Optional[socket.socket] = None
         self.connected = False
         self.authenticated = False
-        
+
         self.callbacks: Dict[str, Callable[[Dict[str, Any]], None]] = {}
         self.event_handlers: Dict[str, List[SafeCallback]] = {}
-        
+
         self.access_token: Optional[str] = None
         self.refresh_token: Optional[str] = None
         self.user_data: Dict[str, Any] = {}
-        
+
         self._running = False
         self._thread: Optional[threading.Thread] = None
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
-        
+
         # Connection status callbacks
         self.on_connection_change_callbacks: List[SafeCallback] = []
         self.on_token_refreshed: Optional[Callable[[str, Optional[str]], None]] = None
         self._consecutive_failures = 0
 
-
     def register_connection_callback(self, cb: Callable[[bool], None]):
-        self.on_connection_change_callbacks = [c for c in self.on_connection_change_callbacks if c.is_alive()]
+        self.on_connection_change_callbacks = [
+            c for c in self.on_connection_change_callbacks if c.is_alive()
+        ]
         if not any(c.matches(cb) for c in self.on_connection_change_callbacks):
             self.on_connection_change_callbacks.append(SafeCallback(cb))
 
     def _notify_connection_change(self):
         status = self.connected and self.authenticated
-        self.on_connection_change_callbacks = [c for c in self.on_connection_change_callbacks if c.is_alive()]
+        self.on_connection_change_callbacks = [
+            c for c in self.on_connection_change_callbacks if c.is_alive()
+        ]
         for cb in self.on_connection_change_callbacks:
             try:
                 cb(status)
@@ -124,7 +134,7 @@ class DiscordIPCClient:
 
         uid = os.getuid()
         runtime_dir = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{uid}")
-        
+
         # Directories where Discord IPC sockets might reside
         base_dirs = [
             runtime_dir,
@@ -143,13 +153,13 @@ class DiscordIPCClient:
             f"/run/user/{uid}/app/com.discordapp.DiscordCanary",
             f"/run/user/{uid}/app/com.discordapp.DiscordPTB",
         ]
-        
+
         # Deduplicate directories preserving order
         unique_dirs = []
         for d in base_dirs:
             if d not in unique_dirs:
                 unique_dirs.append(d)
-                
+
         # Look for discord-ipc-0 through discord-ipc-9 in each directory
         for i in range(10):
             for base_dir in unique_dirs:
@@ -189,9 +199,9 @@ class DiscordIPCClient:
             self._consecutive_failures = 0
 
     def _connect_flatpak_bridge(self) -> bool:
-        if not os.path.exists('/.flatpak-info'):
+        if not os.path.exists("/.flatpak-info"):
             return False
-            
+
         logger.debug("Attempting to connect via Flatpak host bridge...")
         bridge_code = (
             "import os, socket, sys, threading\n"
@@ -252,20 +262,34 @@ class DiscordIPCClient:
             "        os.write(1, d)\n"
             "except: pass\n"
         )
-        
+
         try:
-            cmd = ["flatpak-spawn", "--host", "--directory=/", "python3", "-c", bridge_code]
-            proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            
+            cmd = [
+                "flatpak-spawn",
+                "--host",
+                "--directory=/",
+                "python3",
+                "-c",
+                bridge_code,
+            ]
+            proc = subprocess.Popen(
+                cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
             # Wait a short duration to verify it didn't exit with code 1 or 2
             time.sleep(0.1)
             if proc.poll() is not None:
                 exit_code = proc.returncode
                 err_msg = proc.stderr.read().decode("utf-8", errors="replace")
                 out_msg = proc.stdout.read().decode("utf-8", errors="replace")
-                logger.debug(f"Flatpak host bridge process exited immediately with code {exit_code}. Stderr: {err_msg.strip()}. Stdout: {out_msg.strip()}")
+                logger.debug(
+                    f"Flatpak host bridge process exited immediately with code {exit_code}. Stderr: {err_msg.strip()}. Stdout: {out_msg.strip()}"
+                )
                 return False
-                
+
             self.sock = SubprocessSocketWrapper(proc)
             self.connected = True
             logger.info("Connected to Discord IPC via Flatpak host bridge.")
@@ -312,17 +336,19 @@ class DiscordIPCClient:
                     else:
                         self._consecutive_failures += 1
                         delay = self._get_retry_delay()
-                        logger.debug(f"Could not connect directly or via Flatpak bridge. Retrying in {delay} seconds...")
+                        logger.debug(
+                            f"Could not connect directly or via Flatpak bridge. Retrying in {delay} seconds..."
+                        )
                         self._stop_event.wait(delay)
                         continue
-                
+
                 try:
                     # Handshake
                     self._send_handshake()
-                    
+
                     # Start reading from the socket
                     self._recv_loop()
-                    
+
                     # Connection closed, sleep to prevent hot looping
                     delay = self._get_retry_delay()
                     self._stop_event.wait(delay)
@@ -335,10 +361,7 @@ class DiscordIPCClient:
                 self._stop_event.wait(1)
 
     def _send_handshake(self):
-        payload = {
-            "v": 1,
-            "client_id": self.client_id
-        }
+        payload = {"v": 1, "client_id": self.client_id}
         # Opcode 0 for handshake
         self._send_packet(0, payload)
 
@@ -346,7 +369,7 @@ class DiscordIPCClient:
         if not self.sock:
             logger.error("Cannot send packet: socket not connected.")
             return False
-            
+
         try:
             data = json.dumps(payload).encode("utf-8")
             header = struct.pack("<II", op, len(data))
@@ -358,20 +381,23 @@ class DiscordIPCClient:
             self._disconnect()
             return False
 
-    def send_command(self, cmd: str, args: Dict[str, Any] = None, evt: Optional[str] = None, callback: Optional[Callable[[Dict[str, Any]], None]] = None):
+    def send_command(
+        self,
+        cmd: str,
+        args: Dict[str, Any] = None,
+        evt: Optional[str] = None,
+        callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+    ):
         nonce = str(uuid.uuid4())
-        payload = {
-            "cmd": cmd,
-            "nonce": nonce
-        }
+        payload = {"cmd": cmd, "nonce": nonce}
         if args is not None:
             payload["args"] = args
         if evt is not None:
             payload["evt"] = evt
-            
+
         if callback:
             self.callbacks[nonce] = callback
-            
+
         # Opcode 1 for frame
         self._send_packet(1, payload)
 
@@ -383,15 +409,15 @@ class DiscordIPCClient:
                 if not header:
                     logger.warning("Discord closed connection (empty header).")
                     break
-                
+
                 op, length = struct.unpack("<II", header)
-                
+
                 # Read data
                 data_bytes = self._recv_all(length)
                 if not data_bytes:
                     logger.warning("Discord closed connection (empty body).")
                     break
-                
+
                 payload = json.loads(data_bytes.decode("utf-8"))
                 self._handle_payload(op, payload)
         except Exception as e:
@@ -415,16 +441,17 @@ class DiscordIPCClient:
         return data
 
     def _handle_payload(self, op: int, payload: Dict[str, Any]):
-        logger.debug(f"Received payload: op={op}, cmd={payload.get('cmd')}, evt={payload.get('evt')}")
+        logger.debug(
+            f"Received payload: op={op}, cmd={payload.get('cmd')}, evt={payload.get('evt')}"
+        )
         if op == 2:
             logger.error(f"Discord closed connection with payload: {payload}")
 
-        
         cmd = payload.get("cmd")
         evt = payload.get("evt")
         nonce = payload.get("nonce")
         data = payload.get("data", {})
-        
+
         # Handle ready event (op code response, or READY dispatch)
         if cmd == "DISPATCH" and evt == "READY":
             logger.info("Discord IPC connection handshaked and READY.")
@@ -432,25 +459,35 @@ class DiscordIPCClient:
             # If we already have an access token, try to authenticate immediately
             if self.access_token:
                 logger.info("Found saved access token, authenticating...")
+
                 def on_auth_done(success):
                     if not success:
                         if self.refresh_token and self.client_id and self.client_secret:
-                            logger.info("Saved access token failed to authenticate. Attempting silent refresh with refresh_token...")
+                            logger.info(
+                                "Saved access token failed to authenticate. Attempting silent refresh with refresh_token..."
+                            )
                             self.refresh_token_exchange()
                         else:
-                            logger.warning("Saved access token failed to authenticate. Attempting auto-authorization...")
+                            logger.warning(
+                                "Saved access token failed to authenticate. Attempting auto-authorization..."
+                            )
                             self.auto_authorize()
+
                 self.authenticate(self.access_token, on_auth_done)
             elif self.refresh_token and self.client_id and self.client_secret:
-                logger.info("No saved access token but refresh token present. Refreshing access token...")
+                logger.info(
+                    "No saved access token but refresh token present. Refreshing access token..."
+                )
                 self.refresh_token_exchange()
             elif self.client_id and self.client_secret:
-                logger.info("No saved access token but credentials present. Attempting auto-authorization...")
+                logger.info(
+                    "No saved access token but credentials present. Attempting auto-authorization..."
+                )
                 self.auto_authorize()
             else:
                 # Otherwise notify connection change so main plugin knows we're ready for authorize
                 self._notify_connection_change()
-        
+
         # Execute callbacks registered for this nonce
         if nonce and nonce in self.callbacks:
             callback = self.callbacks.pop(nonce)
@@ -458,11 +495,13 @@ class DiscordIPCClient:
                 callback(payload)
             except Exception as e:
                 logger.error(f"Error in nonce callback: {e}")
-                
+
         # Trigger event handlers
         if cmd == "DISPATCH" and evt:
             if evt in self.event_handlers:
-                self.event_handlers[evt] = [h for h in self.event_handlers[evt] if h.is_alive()]
+                self.event_handlers[evt] = [
+                    h for h in self.event_handlers[evt] if h.is_alive()
+                ]
                 for handler in self.event_handlers[evt]:
                     try:
                         handler(data)
@@ -472,12 +511,18 @@ class DiscordIPCClient:
     def authorize(self, callback: Callable[[Optional[str]], None]):
         """Request user authorization code"""
         logger.info("Requesting authorization code from Discord...")
-        
+
         args = {
             "client_id": self.client_id,
-            "scopes": ["rpc", "rpc.notifications.read", "rpc.voice.read", "rpc.voice.write", "messages.read"]
+            "scopes": [
+                "rpc",
+                "rpc.notifications.read",
+                "rpc.voice.read",
+                "rpc.voice.write",
+                "messages.read",
+            ],
         }
-        
+
         def on_auth_response(payload: Dict[str, Any]):
             if payload.get("evt") == "ERROR" or "code" not in payload.get("data", {}):
                 logger.error(f"Authorization failed: {payload}")
@@ -486,30 +531,32 @@ class DiscordIPCClient:
                 code = payload["data"]["code"]
                 logger.info("Received authorization code.")
                 callback(code)
-                
+
         self.send_command("AUTHORIZE", args=args, callback=on_auth_response)
 
-    def token_exchange(self, code: str, callback: Callable[[Optional[str], Optional[str]], None]):
+    def token_exchange(
+        self, code: str, callback: Callable[[Optional[str], Optional[str]], None]
+    ):
         """Exchange authorization code for access token & refresh token via HTTP POST"""
         logger.info("Exchanging code for access token...")
-        
+
         url = "https://discord.com/api/oauth2/token"
         headers = {
             "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
         }
-        
+
         data_dict = {
             "client_id": self.client_id,
             "client_secret": self.client_secret,
             "grant_type": "authorization_code",
             "code": code,
-            "redirect_uri": self.redirect_uri
+            "redirect_uri": self.redirect_uri,
         }
-        
+
         data = urllib.parse.urlencode(data_dict).encode("utf-8")
         req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-        
+
         def run_exchange():
             try:
                 with urllib.request.urlopen(req, timeout=10) as response:
@@ -524,7 +571,9 @@ class DiscordIPCClient:
                     err_content = e.read().decode("utf-8")
                 except Exception:
                     err_content = ""
-                logger.error(f"HTTP Error {e.code} during token exchange: {err_content or e.reason}")
+                logger.error(
+                    f"HTTP Error {e.code} during token exchange: {err_content or e.reason}"
+                )
                 callback(None, None)
             except Exception as e:
                 logger.error(f"Error exchanging code: {e}")
@@ -535,7 +584,9 @@ class DiscordIPCClient:
     def refresh_token_exchange(self, callback: Optional[Callable[[bool], None]] = None):
         """Use stored refresh_token to silently obtain a new access_token without user interaction"""
         if not self.refresh_token or not self.client_id or not self.client_secret:
-            logger.warning("Token refresh skipped: missing refresh_token or client credentials.")
+            logger.warning(
+                "Token refresh skipped: missing refresh_token or client credentials."
+            )
             if callback:
                 callback(False)
             return
@@ -545,14 +596,14 @@ class DiscordIPCClient:
         url = "https://discord.com/api/oauth2/token"
         headers = {
             "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
         }
 
         data_dict = {
             "client_id": self.client_id,
             "client_secret": self.client_secret,
             "grant_type": "refresh_token",
-            "refresh_token": self.refresh_token
+            "refresh_token": self.refresh_token,
         }
 
         data = urllib.parse.urlencode(data_dict).encode("utf-8")
@@ -567,7 +618,9 @@ class DiscordIPCClient:
                     new_refresh_token = parsed.get("refresh_token")
 
                     if not new_access_token:
-                        logger.error("Token refresh response did not contain access_token.")
+                        logger.error(
+                            "Token refresh response did not contain access_token."
+                        )
                         if callback:
                             callback(False)
                         else:
@@ -589,7 +642,9 @@ class DiscordIPCClient:
                     # Authenticate connection with new token
                     def on_auth_done(success):
                         if not success:
-                            logger.warning("Refreshed access token failed IPC authentication. Falling back to auto-authorization...")
+                            logger.warning(
+                                "Refreshed access token failed IPC authentication. Falling back to auto-authorization..."
+                            )
                             self.auto_authorize()
                         if callback:
                             callback(success)
@@ -601,8 +656,12 @@ class DiscordIPCClient:
                     err_content = e.read().decode("utf-8")
                 except Exception:
                     err_content = ""
-                logger.error(f"HTTP Error {e.code} during token refresh: {err_content or e.reason}")
-                logger.warning("Refresh token may be invalid/expired. Falling back to auto-authorization...")
+                logger.error(
+                    f"HTTP Error {e.code} during token refresh: {err_content or e.reason}"
+                )
+                logger.warning(
+                    "Refresh token may be invalid/expired. Falling back to auto-authorization..."
+                )
                 self.refresh_token = None
                 self.auto_authorize()
                 if callback:
@@ -618,57 +677,62 @@ class DiscordIPCClient:
     def auto_authorize(self):
         """Auto-authorize app silently in the background if already authorized, or prompt user if not"""
         if not self.client_id or not self.client_secret:
-            logger.warning("Auto-authorization skipped: missing Client ID or Client Secret.")
+            logger.warning(
+                "Auto-authorization skipped: missing Client ID or Client Secret."
+            )
             self._notify_connection_change()
             return
-            
+
         logger.info("Running auto-authorization sequence...")
-        
+
         def auth_callback(code):
             if not code:
-                logger.error("Auto-authorization failed: did not receive code from Discord.")
+                logger.error(
+                    "Auto-authorization failed: did not receive code from Discord."
+                )
                 self._notify_connection_change()
                 return
-                
+
             def token_callback(token, refresh_token):
                 if not token:
                     logger.error("Auto-authorization token exchange failed.")
                     self._notify_connection_change()
                     return
-                
-                logger.info("Auto-authorization token received. Updating and authenticating...")
+
+                logger.info(
+                    "Auto-authorization token received. Updating and authenticating..."
+                )
                 self.access_token = token
                 if refresh_token:
                     self.refresh_token = refresh_token
-                
+
                 # Notify main plugin to save token in settings
                 if self.on_token_refreshed:
                     try:
                         self.on_token_refreshed(token, refresh_token)
                     except Exception as e:
                         logger.error(f"Error calling on_token_refreshed: {e}")
-                        
+
                 self.authenticate(token)
-                
+
             self.token_exchange(code, token_callback)
-            
+
         self.authorize(auth_callback)
 
-
-    def authenticate(self, token: str, callback: Optional[Callable[[bool], None]] = None):
+    def authenticate(
+        self, token: str, callback: Optional[Callable[[bool], None]] = None
+    ):
         """Authenticate connection using access token"""
         logger.info("Authenticating IPC session...")
         self.access_token = token
-        
-        args = {
-            "access_token": token
-        }
-        
+
+        args = {"access_token": token}
+
         def on_auth_response(payload: Dict[str, Any]):
             if payload.get("evt") == "ERROR":
                 logger.error(f"Authentication failed: {payload}")
                 self.authenticated = False
-                self.access_token = None # Clear invalid token
+                self.access_token = None  # Clear invalid token
                 if callback:
                     callback(False)
             else:
@@ -678,26 +742,38 @@ class DiscordIPCClient:
                 self._notify_connection_change()
                 if callback:
                     callback(True)
-                    
+
         self.send_command("AUTHENTICATE", args=args, callback=on_auth_response)
 
-    def subscribe(self, event: str, callback: Optional[Callable[[Dict[str, Any]], None]] = None):
+    def subscribe(
+        self, event: str, callback: Optional[Callable[[Dict[str, Any]], None]] = None
+    ):
         """Subscribe to dispatch events"""
         logger.info(f"Subscribing to event: {event}")
+
         def on_sub_response(payload: Dict[str, Any]):
             if payload.get("evt") == "ERROR":
-                logger.warning(f"Subscription to {event} failed with ERROR: {payload.get('data')}")
+                logger.warning(
+                    f"Subscription to {event} failed with ERROR: {payload.get('data')}"
+                )
                 if event == "NOTIFICATION_CREATE" and self.client_id:
-                    logger.info("Attempting auto-authorization to request notification permissions...")
+                    logger.info(
+                        "Attempting auto-authorization to request notification permissions..."
+                    )
                     self.auto_authorize()
             if callback:
                 callback(payload)
+
         self.send_command("SUBSCRIBE", evt=event, callback=on_sub_response)
 
-    def register_event_handler(self, event: str, handler: Callable[[Dict[str, Any]], None]):
+    def register_event_handler(
+        self, event: str, handler: Callable[[Dict[str, Any]], None]
+    ):
         if event not in self.event_handlers:
             self.event_handlers[event] = []
-        self.event_handlers[event] = [h for h in self.event_handlers[event] if h.is_alive()]
+        self.event_handlers[event] = [
+            h for h in self.event_handlers[event] if h.is_alive()
+        ]
         if not any(h.matches(handler) for h in self.event_handlers[event]):
             self.event_handlers[event].append(SafeCallback(handler))
 
@@ -705,7 +781,13 @@ class DiscordIPCClient:
         """Get voice settings"""
         self.send_command("GET_VOICE_SETTINGS", callback=callback)
 
-    def set_voice_settings(self, mute: Optional[bool] = None, deaf: Optional[bool] = None, mode_type: Optional[str] = None, callback: Optional[Callable[[Dict[str, Any]], None]] = None):
+    def set_voice_settings(
+        self,
+        mute: Optional[bool] = None,
+        deaf: Optional[bool] = None,
+        mode_type: Optional[str] = None,
+        callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+    ):
         """Set voice settings"""
         args = {}
         if mute is not None:
@@ -714,35 +796,39 @@ class DiscordIPCClient:
             args["deaf"] = deaf
         if mode_type is not None:
             args["mode"] = {"type": mode_type}
-            
+
         self.send_command("SET_VOICE_SETTINGS", args=args, callback=callback)
 
-    def set_voice_input_mode(self, mode_type: str, callback: Optional[Callable[[Dict[str, Any]], None]] = None):
+    def set_voice_input_mode(
+        self,
+        mode_type: str,
+        callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+    ):
         """Set voice input mode ('PUSH_TO_TALK' or 'VOICE_ACTIVITY')"""
-        args = {
-            "mode": {
-                "type": mode_type
-            }
-        }
+        args = {"mode": {"type": mode_type}}
         self.send_command("SET_VOICE_SETTINGS", args=args, callback=callback)
 
-    def select_voice_channel(self, channel_id: Optional[str] = None, force: bool = True, callback: Optional[Callable[[Dict[str, Any]], None]] = None):
+    def select_voice_channel(
+        self,
+        channel_id: Optional[str] = None,
+        force: bool = True,
+        callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+    ):
         """Join or leave a voice channel"""
-        args = {
-            "channel_id": channel_id,
-            "force": force
-        }
+        args = {"channel_id": channel_id, "force": force}
         self.send_command("SELECT_VOICE_CHANNEL", args=args, callback=callback)
 
     def get_selected_voice_channel(self, callback: Callable[[Dict[str, Any]], None]):
         """Get currently selected voice channel"""
         self.send_command("GET_SELECTED_VOICE_CHANNEL", callback=callback)
 
-    def select_text_channel(self, channel_id: Optional[str] = None, callback: Optional[Callable[[Dict[str, Any]], None]] = None):
+    def select_text_channel(
+        self,
+        channel_id: Optional[str] = None,
+        callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+    ):
         """Select a text channel"""
-        args = {
-            "channel_id": channel_id
-        }
+        args = {"channel_id": channel_id}
         self.send_command("SELECT_TEXT_CHANNEL", args=args, callback=callback)
 
     def get_guilds(self, callback: Callable[[Dict[str, Any]], None]):
@@ -751,14 +837,42 @@ class DiscordIPCClient:
 
     def get_channels(self, guild_id: str, callback: Callable[[Dict[str, Any]], None]):
         """Get list of channels in a guild"""
-        args = {
-            "guild_id": guild_id
-        }
+        args = {"guild_id": guild_id}
         self.send_command("GET_CHANNELS", args=args, callback=callback)
 
     def get_guild(self, guild_id: str, callback: Callable[[Dict[str, Any]], None]):
         """Get details for a specific guild (server)"""
-        args = {
-            "guild_id": guild_id
-        }
+        args = {"guild_id": guild_id}
         self.send_command("GET_GUILD", args=args, callback=callback)
+
+    def get_soundboard_sounds(
+        self, guild_id: str, callback: Callable[[Dict[str, Any]], None]
+    ):
+        """Get available soundboard sounds for a guild (experimental RPC support)."""
+        args = {"guild_id": guild_id}
+        self.send_command("GET_SOUNDBOARD_SOUNDS", args=args, callback=callback)
+
+    def play_soundboard_sound(
+        self,
+        sound_id: str,
+        source_guild_id: Optional[str] = None,
+        callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+    ):
+        """Play a soundboard sound in the current voice channel (experimental RPC support)."""
+        args = {"sound_id": sound_id}
+        if source_guild_id:
+            args["source_guild_id"] = source_guild_id
+
+        def on_play_response(payload: Dict[str, Any]):
+            # Some Discord builds may expose this as SEND_SOUNDBOARD_SOUND instead.
+            if payload.get("evt") == "ERROR":
+                logger.warning(
+                    "PLAY_SOUNDBOARD_SOUND failed, trying SEND_SOUNDBOARD_SOUND fallback."
+                )
+                self.send_command("SEND_SOUNDBOARD_SOUND", args=args, callback=callback)
+                return
+
+            if callback:
+                callback(payload)
+
+        self.send_command("PLAY_SOUNDBOARD_SOUND", args=args, callback=on_play_response)
