@@ -273,7 +273,9 @@ class SoundboardAction(ActionBase):
                         if not isinstance(sound, dict):
                             continue
                         sid = sound.get("sound_id") or sound.get("id")
-                        sname = sound.get("name") or sound.get("sound") or "Unnamed Sound"
+                        sname = (
+                            sound.get("name") or sound.get("sound") or "Unnamed Sound"
+                        )
                         if not sid:
                             continue
                         sid_str = str(sid)
@@ -293,7 +295,9 @@ class SoundboardAction(ActionBase):
 
             GLib.idle_add(apply_metadata)
 
-        self.plugin_base.discord_client.get_soundboard_sounds(guild_id, on_sounds_received)
+        self.plugin_base.discord_client.get_soundboard_sounds(
+            guild_id, on_sounds_received
+        )
 
     def on_key_down(self) -> None:
         client = self.plugin_base.discord_client
@@ -323,6 +327,10 @@ class SoundboardAction(ActionBase):
                     "SoundboardAction: You must be connected to a voice channel to play a sound."
                 )
                 self.set_bottom_label("Join Voice First", font_size=11)
+
+                # Keep icon/metadata in sync even when playback is blocked by voice state.
+                self.hydrate_selected_sound_metadata()
+                self.update_sound_icon()
                 return
 
             selected_channel_id = str(channel_data.get("id"))
@@ -348,10 +356,12 @@ class SoundboardAction(ActionBase):
 
                 logger.info(f"SoundboardAction: Played soundboard sound {sound_id}")
                 self.update_labels()
+                self.update_sound_icon()
 
             # If metadata is not loaded yet (cold start before config UI opens),
             # request sounds once and then retry playback so guild sounds can include source_guild_id.
             if configured_guild_id and sound_id not in self.sounds_meta:
+
                 def on_hydrate_then_play(payload_sounds: dict):
                     data = payload_sounds.get("data", {})
                     if isinstance(data, list):
@@ -370,12 +380,16 @@ class SoundboardAction(ActionBase):
                         if not isinstance(sound, dict):
                             continue
                         sid = sound.get("sound_id") or sound.get("id")
-                        sname = sound.get("name") or sound.get("sound") or "Unnamed Sound"
+                        sname = (
+                            sound.get("name") or sound.get("sound") or "Unnamed Sound"
+                        )
                         if not sid:
                             continue
                         sid_str = str(sid)
                         self.sounds_meta[sid_str] = sound
-                        if not any(existing_id == sid_str for existing_id, _ in self.sounds_map):
+                        if not any(
+                            existing_id == sid_str for existing_id, _ in self.sounds_map
+                        ):
                             self.sounds_map.append((sid_str, sname))
 
                     sound_meta_retry = self.sounds_meta.get(sound_id, {})
