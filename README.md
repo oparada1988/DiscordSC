@@ -102,6 +102,12 @@ When the Discord desktop application is closed or disconnected, all plugin actio
   ```bash
   flatpak override --filesystem=xdg-run/discord-ipc-* com.core447.StreamController
   ```
+  Alternatively, you can grant the same permission graphically using **Flatseal**:
+  1. Install [Flatseal](https://flathub.org/apps/com.github.tchx84.Flatseal) from Flathub if you haven't already.
+  2. Open Flatseal and select **StreamController** (`com.core447.StreamController`) from the application list.
+  3. Scroll to the **Filesystem** section under **Other files**.
+  4. Click the **+** button and enter `xdg-run/discord-ipc-*`.
+  5. Restart StreamController for the permission to take effect.
 
 * **Authentication Failures**:  
   Confirm that your Client ID, Client Secret, and Redirect URI in StreamController settings match your Discord Developer Portal application settings exactly.
