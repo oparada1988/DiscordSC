@@ -38,6 +38,10 @@ When the Discord desktop application is closed or disconnected, all plugin actio
   <img src="assets/input_voice_activity.png" width="48" alt="Input Mode Action" />  
   Switches Discord's input mode setting between Voice Activity (`input_voice_activity.png`) and Push-to-Talk mode (`input_push_to_talk.png`) without altering your microphone mute status.
 
+* **Soundboard Sound**  
+  <img src="assets/soundboard.png" width="48" alt="Soundboard Action" />  
+  Select a server and a Discord soundboard sound from action settings, then press the key to play it in your currently connected voice channel. If your Discord RPC build does not expose soundboard commands, the action will show an unsupported status.
+
 ---
 
 ### Channels & Server Controls
@@ -98,6 +102,12 @@ When the Discord desktop application is closed or disconnected, all plugin actio
   ```bash
   flatpak override --filesystem=xdg-run/discord-ipc-* com.core447.StreamController
   ```
+  Alternatively, you can grant the same permission graphically using **Flatseal**:
+  1. Install [Flatseal](https://flathub.org/apps/com.github.tchx84.Flatseal) from Flathub if you haven't already.
+  2. Open Flatseal and select **StreamController** (`com.core447.StreamController`) from the application list.
+  3. Scroll to the **Filesystem** section under **Other files**.
+  4. Click the **+** button and enter `xdg-run/discord-ipc-*`.
+  5. Restart StreamController for the permission to take effect.
 
 * **Authentication Failures**:  
   Confirm that your Client ID, Client Secret, and Redirect URI in StreamController settings match your Discord Developer Portal application settings exactly.

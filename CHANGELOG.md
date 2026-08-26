@@ -1,3 +1,12 @@
+# DiscordSC Version 1.2.3 Changelog
+
+### Version 1.2.3 Improvements
+* **New Soundboard Action (`SoundboardAction`)**: Added an action that lets users select a Discord server and soundboard sound, then trigger that sound in their current voice channel directly from StreamController.
+* **Discord IPC Extensions**: Added `GET_SOUNDBOARD_SOUNDS` and `PLAY_SOUNDBOARD_SOUND` (with `SEND_SOUNDBOARD_SOUND` fallback) helper methods to the local Discord RPC client for broader compatibility.
+* **Soundboard Offline/Unsupported States**: Added disconnected and unsupported UX states so action configuration and key labels remain clear when Discord RPC does not expose soundboard endpoints.
+
+---
+
 # DiscordSC Version 1.2.2 Changelog
 
 ### Version 1.2.2 Improvements
