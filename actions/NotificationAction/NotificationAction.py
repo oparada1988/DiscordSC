@@ -3,6 +3,7 @@ from src.backend.PluginManager.ActionBase import ActionBase
 from src.backend.DeckManagement.DeckController import DeckController
 from src.backend.PageManagement.Page import Page
 from src.backend.PluginManager.PluginBase import PluginBase
+from src.backend.DeckManagement.InputIdentifier import Input, InputEvent
 
 # Import python & gtk modules
 import os
@@ -25,6 +26,10 @@ class NotificationAction(ActionBase):
         self.current_avatar_index = 0
         self.timer_source_id = None
         self._lock = threading.Lock()
+        self.is_connected = False
+        self._hold_timer: Optional[threading.Timer] = None
+        self._hold_triggered = False
+        self._key_pressed = False
         
         # Paths
         self.base_icon_path = os.path.join(self.plugin_base.PATH, "assets", "notifications_base.png")
@@ -68,8 +73,11 @@ class NotificationAction(ActionBase):
                     if apm.get_image_control_index() is None or not self.get_is_multi_action():
                         if apm.get_image_control_index() != own_index:
                             apm.set_image_control_index(own_index, reload_pages=False, reload_self=False)
+                    if apm.get_label_control_index(2) is None or not self.get_is_multi_action():
+                        if apm.get_label_control_index(2) != own_index:
+                            apm.set_label_control_index(2, own_index, reload_pages=False, reload_self=False)
         except Exception as e:
-            logger.error(f"NotificationAction: Error setting image control: {e}")
+            logger.error(f"NotificationAction: Error setting image/label control: {e}")
 
         # Register IPC callbacks
         client = self.plugin_base.discord_client
@@ -78,12 +86,14 @@ class NotificationAction(ActionBase):
         client.register_event_handler("MESSAGE_CREATE", self.on_message_create)
 
         # Initial connection sync
-        self.on_connection_change(client.connected and client.authenticated)
+        self.is_connected = bool(client.connected and client.authenticated)
+        self.on_connection_change(self.is_connected)
         
         # Start GLib cycle timer (5 seconds)
         self.start_cycle_timer()
 
     def on_connection_change(self, is_connected: bool):
+        self.is_connected = is_connected
         if not is_connected:
             logger.info("NotificationAction: Discord disconnected. Preserving pending notifications.")
             media_path = os.path.join(self.plugin_base.PATH, "assets", "notification_disconnected.png")
@@ -201,7 +211,8 @@ class NotificationAction(ActionBase):
                     with open(avatar_file, "wb") as f:
                         f.write(content)
                 logger.info(f"Downloaded avatar for {author_id}")
-                GLib.idle_add(self.update_display)
+                if self.is_connected:
+                    GLib.idle_add(self.update_display)
             except Exception as e:
                 logger.error(f"Failed downloading avatar for {author_id}: {e}")
 
@@ -223,6 +234,8 @@ class NotificationAction(ActionBase):
     def cycle_next_avatar(self) -> bool:
         if not self.get_is_present():
             return True
+        if not self.is_connected:
+            return True
         with self._lock:
             if len(self.unread_notifications) > 1:
                 self.current_avatar_index = (self.current_avatar_index + 1) % len(self.unread_notifications)
@@ -234,6 +247,14 @@ class NotificationAction(ActionBase):
             return sum(item["count"] for item in self.unread_notifications)
 
     def update_display(self):
+        if not self.is_connected:
+            media_path = os.path.join(self.plugin_base.PATH, "assets", "notification_disconnected.png")
+            if not os.path.exists(media_path):
+                media_path = self.base_icon_path
+            self.set_media(media_path=media_path, size=1.0)
+            self.set_bottom_label("Disconnected", font_size=12)
+            return
+
         total_count = self.get_total_unread_count()
 
         if total_count == 0:
@@ -280,30 +301,64 @@ class NotificationAction(ActionBase):
 
             base_img.paste(avatar_img, (av_x, av_y), mask)
 
-            # Scaled Red Circle Badge at Top-Center (Scaled down to fit inside key bounds)
+            # Red Badge / Capsule at Top-Center
             draw = ImageDraw.Draw(base_img)
-            badge_r = int(w * 0.14)
+            badge_cy = int(h * 0.18)
             badge_cx = w // 2
-            badge_cy = int(h * 0.20)
 
-            draw.ellipse(
-                [badge_cx - badge_r, badge_cy - badge_r, badge_cx + badge_r, badge_cy + badge_r],
-                fill=(255, 0, 0, 255),
-                outline=(255, 255, 255, 255),
-                width=max(1, int(w * 0.012))
-            )
-
-            # Count text inside badge
             count_str = str(total_count) if total_count < 99 else "99+"
-            font_size = int(badge_r * 1.15)
-            try:
-                font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size)
-            except Exception:
-                font = ImageFont.load_default()
+
+            # Choose proportional font size depending on character count
+            if len(count_str) == 1:
+                fsize = int(h * 0.13)
+            elif len(count_str) == 2:
+                fsize = int(h * 0.12)
+            else:
+                fsize = int(h * 0.105)
+
+            font_candidates = [
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
+                "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
+                "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+                "/usr/share/fonts/liberation-sans/LiberationSans-Bold.ttf",
+            ]
+            font_path = next((p for p in font_candidates if os.path.exists(p)), None)
+            font = ImageFont.truetype(font_path, fsize) if font_path else ImageFont.load_default()
 
             bbox = draw.textbbox((0, 0), count_str, font=font)
             tw = bbox[2] - bbox[0]
             th = bbox[3] - bbox[1]
+
+            # Ensure text fits with comfortable padding inside maximum badge bounds
+            max_text_width = int(w * 0.40)
+            while tw > max_text_width and fsize > 14 and font_path:
+                fsize -= 2
+                try:
+                    font = ImageFont.truetype(font_path, fsize)
+                    bbox = draw.textbbox((0, 0), count_str, font=font)
+                    tw = bbox[2] - bbox[0]
+                    th = bbox[3] - bbox[1]
+                except Exception:
+                    break
+
+            # Height and horizontal padding to form stadium/capsule shape
+            badge_h = max(int(h * 0.20), th + int(h * 0.06))
+            h_padding = int(h * 0.06) if len(count_str) > 1 else 0
+            badge_w = max(badge_h, tw + h_padding * 2)
+
+            bx0 = int(badge_cx - badge_w / 2)
+            by0 = int(badge_cy - badge_h / 2)
+            bx1 = int(badge_cx + badge_w / 2)
+            by1 = int(badge_cy + badge_h / 2)
+
+            draw.rounded_rectangle(
+                [bx0, by0, bx1, by1],
+                radius=badge_h // 2,
+                fill=(255, 0, 0, 255),
+                outline=(255, 255, 255, 255),
+                width=max(2, int(w * 0.015))
+            )
 
             tx = badge_cx - tw / 2 - bbox[0]
             ty = badge_cy - th / 2 - bbox[1]
@@ -317,8 +372,66 @@ class NotificationAction(ActionBase):
             if os.path.exists(self.base_icon_path):
                 self.set_media(media_path=self.base_icon_path, size=1.0)
 
+    def event_callback(self, event: Any, data: dict = None):
+        if hasattr(Input, "Key") and hasattr(Input.Key, "Events"):
+            if event == Input.Key.Events.HOLD_START or event == getattr(Input.Dial.Events, "HOLD_START", None):
+                self.on_hold()
+                return
+        super().event_callback(event, data)
+
     def on_key_down(self) -> None:
-        logger.info("NotificationAction: Key pressed to view active DM thread")
+        self._key_pressed = True
+        self._hold_triggered = False
+        if self._hold_timer:
+            try:
+                self._hold_timer.cancel()
+            except Exception:
+                pass
+        self._hold_timer = threading.Timer(0.6, self.on_hold)
+        self._hold_timer.daemon = True
+        self._hold_timer.start()
+
+    def on_hold(self) -> None:
+        with self._lock:
+            if not self._key_pressed or self._hold_triggered:
+                return
+            self._hold_triggered = True
+            if self._hold_timer:
+                try:
+                    self._hold_timer.cancel()
+                except Exception:
+                    pass
+                self._hold_timer = None
+
+            logger.info("NotificationAction: Hold to clear all triggered")
+            self.unread_notifications.clear()
+            self.current_avatar_index = 0
+            self.save_persisted_state()
+
+        def apply_cleared():
+            self.set_bottom_label("Cleared", font_size=12)
+            self.update_display()
+            GLib.timeout_add(1200, lambda: self.set_bottom_label("" if self.is_connected else "Disconnected", font_size=12) or False)
+
+        GLib.idle_add(apply_cleared)
+
+    def on_key_up(self) -> None:
+        self._key_pressed = False
+        if self._hold_timer:
+            try:
+                self._hold_timer.cancel()
+            except Exception:
+                pass
+            self._hold_timer = None
+
+        if self._hold_triggered:
+            self._hold_triggered = False
+            return
+
+        self.on_tap()
+
+    def on_tap(self) -> None:
+        logger.info("NotificationAction: Tap to view active DM thread")
         active_channel_id = None
 
         with self._lock:
@@ -354,25 +467,40 @@ class NotificationAction(ActionBase):
 
         GLib.idle_add(self.update_display)
 
-    def on_key_up(self) -> None:
-        pass
-
     def get_config_rows(self) -> list:
         row = Adw.ActionRow(
             title="Discord Notification Action",
-            subtitle="Displays unread notification counter and sender profile avatars (5s cycle). Press to view active DM."
+            subtitle="Displays unread notification counter and sender profile avatars (5s cycle). Press to view active DM, hold to clear all."
         )
         return [row]
 
     def on_remove(self) -> None:
         self.stop_cycle_timer()
+        if self._hold_timer:
+            try:
+                self._hold_timer.cancel()
+            except Exception:
+                pass
+            self._hold_timer = None
         self.save_persisted_state()
 
     def on_disconnect(self) -> None:
         self.stop_cycle_timer()
+        if self._hold_timer:
+            try:
+                self._hold_timer.cancel()
+            except Exception:
+                pass
+            self._hold_timer = None
 
     def on_removed_from_cache(self) -> None:
         self.on_remove()
 
     def __del__(self):
         self.stop_cycle_timer()
+        if hasattr(self, "_hold_timer") and self._hold_timer:
+            try:
+                self._hold_timer.cancel()
+            except Exception:
+                pass
+            self._hold_timer = None

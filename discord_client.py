@@ -681,9 +681,9 @@ class DiscordIPCClient:
                     
         self.send_command("AUTHENTICATE", args=args, callback=on_auth_response)
 
-    def subscribe(self, event: str, callback: Optional[Callable[[Dict[str, Any]], None]] = None):
+    def subscribe(self, event: str, args: Optional[Dict[str, Any]] = None, callback: Optional[Callable[[Dict[str, Any]], None]] = None):
         """Subscribe to dispatch events"""
-        logger.info(f"Subscribing to event: {event}")
+        logger.info(f"Subscribing to event: {event} (args={args})")
         def on_sub_response(payload: Dict[str, Any]):
             if payload.get("evt") == "ERROR":
                 logger.warning(f"Subscription to {event} failed with ERROR: {payload.get('data')}")
@@ -692,7 +692,12 @@ class DiscordIPCClient:
                     self.auto_authorize()
             if callback:
                 callback(payload)
-        self.send_command("SUBSCRIBE", evt=event, callback=on_sub_response)
+        self.send_command("SUBSCRIBE", args=args, evt=event, callback=on_sub_response)
+
+    def unsubscribe(self, event: str, args: Optional[Dict[str, Any]] = None, callback: Optional[Callable[[Dict[str, Any]], None]] = None):
+        """Unsubscribe from dispatch events"""
+        logger.info(f"Unsubscribing from event: {event} (args={args})")
+        self.send_command("UNSUBSCRIBE", args=args, evt=event, callback=callback)
 
     def register_event_handler(self, event: str, handler: Callable[[Dict[str, Any]], None]):
         if event not in self.event_handlers:
@@ -781,3 +786,23 @@ class DiscordIPCClient:
             args["source_guild_id"] = source_guild_id
             args["guild_id"] = source_guild_id
         self.send_command("PLAY_SOUNDBOARD_SOUND", args=args, callback=callback)
+    
+    def set_user_voice_settings(self, user_id: str, volume: Optional[int] = None, mute: Optional[bool] = None, pan: Optional[Dict[str, float]] = None, callback: Optional[Callable[[Dict[str, Any]], None]] = None):
+        """Set voice settings (volume, mute, pan) for a specific user in voice chat"""
+        args: Dict[str, Any] = {
+            "user_id": str(user_id)
+        }
+        if volume is not None:
+            args["volume"] = max(0, min(200, int(volume)))
+        if mute is not None:
+            args["mute"] = bool(mute)
+        if pan is not None:
+            args["pan"] = pan
+        self.send_command("SET_USER_VOICE_SETTINGS", args=args, callback=callback)
+
+    def get_channel(self, channel_id: str, callback: Callable[[Dict[str, Any]], None]):
+        """Get details and voice states for a specific channel"""
+        args = {
+            "channel_id": str(channel_id)
+        }
+        self.send_command("GET_CHANNEL", args=args, callback=callback)

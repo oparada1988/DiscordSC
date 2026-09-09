@@ -26,6 +26,7 @@ from .actions.NotificationAction.NotificationAction import NotificationAction
 from .actions.ServerStatusAction.ServerStatusAction import ServerStatusAction
 from .actions.InputModeAction.InputModeAction import InputModeAction
 from .actions.SoundboardAction.SoundboardAction import SoundboardAction
+from .actions.CallMixerAction.CallMixerAction import CallMixerAction
 
 class PluginTemplate(PluginBase):
     def __init__(self):
@@ -180,6 +181,20 @@ class PluginTemplate(PluginBase):
             }
         )
         self.add_action_holder(self.soundboard_action_holder)
+
+        self.call_mixer_action_holder = ActionHolder(
+            plugin_base=self,
+            action_base=CallMixerAction,
+            action_id="com_oparada_DiscordSC::CallMixerAction",
+            action_name="Discord Call Mixer",
+            icon=Gtk.Image(file=os.path.join(self.PATH, "assets", "action-call-mixer.png")),
+            action_support={
+                Input.Key: ActionInputSupport.SUPPORTED,
+                Input.Dial: ActionInputSupport.SUPPORTED,
+                Input.Touchscreen: ActionInputSupport.SUPPORTED
+            }
+        )
+        self.add_action_holder(self.call_mixer_action_holder)
 
         # Load manifest version dynamically
         plugin_ver = "1.0.0"

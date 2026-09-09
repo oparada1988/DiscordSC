@@ -60,11 +60,21 @@ When the Discord desktop application is closed or disconnected, all plugin actio
 
 ---
 
+* **Discord Call Mixer (Dial & Touchscreen)**  
+  <img src="assets/action-call-mixer.png" width="48" alt="Call Mixer Action" />  
+  Individual participant volume and mute controller for voice and video calls on Stream Deck + dials and LCD touch strips.
+  * **Turn Dial**: Adjusts the selected participant's local volume up or down (configurable step size, default 5%, range 0%–200%).
+  * **Press Dial**: Toggles local mute for the selected participant.
+  * **Tap LCD**: Cycles to the next eligible speaker in the call with permission to speak (automatically filters out suppressed stage audience and bots).
+  * **LCD Strip Display**: Shows participant circular avatar (with green speaking glow or red muted ring), display name, counter `[ 2 / 5 ]`, and graphical volume bar.
+
+---
+
 ### Notifications & Messaging
 
 * **Notification Hub**  
   <img src="assets/notification.png" width="48" alt="Notification Action" />  
-  Tracks unread Direct Messages and server mentions. Displays sender profile avatars along with a red notification count badge. Automatically cycles through pending notification avatars every 5 seconds. Pressing the key opens Discord directly to the unread channel or DM and clears the notification queue.
+  Tracks unread Direct Messages and server mentions. Displays sender profile avatars along with a red notification count badge. Automatically cycles through pending notification avatars every 5 seconds. Tap the key to open Discord directly to the active DM and dismiss it, or **hold the key** to clear all notifications. Shows disconnected icon when Discord is closed.
 
 ---
 
